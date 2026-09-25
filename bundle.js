@@ -1,4 +1,4 @@
-/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=a71e3230f6 */
+/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=9b1b3640c9 */
 /* ===== config.js ===== */
 // ====== 这里是可以改的设置 ======
 window.APP_CONFIG = {
@@ -17,25 +17,31 @@ window.APP_CONFIG = {
 // id 只用英文和横线（会当文件名用）；stage 是阶段标签；text 是读给奶奶听、显示给奶奶看的问题。
 window.QUESTIONS = [
   {"id": "childhood-home",    "stage": "童年",      "text": "您小时候住在哪里？家里是什么样子的？"},
-  {"id": "parents",           "stage": "童年",      "text": "您的爸爸妈妈是什么样的人？"},
-  {"id": "childhood-happy",   "stage": "童年",      "text": "您小时候最开心的一件事是什么？"},
+  {"id": "childhood-home",    "stage": "童年",      "text": "您小时候家里有几口人？大院子里是怎么个情况？"},
+  {"id": "parents",           "stage": "童年",      "text": "您的爸爸妈妈是什么样的人？您对您的爸爸妈妈还有什么样的映像？"},
+  {"id": "parents",           "stage": "童年",      "text": "您的爸爸妈妈是怎么去世的？"},
+  {"id": "childhood-happy",   "stage": "童年",      "text": "您小时候最满意最开心的一件事是什么？"},
   {"id": "childhood-food",    "stage": "童年",      "text": "小时候家里都吃些什么？您最爱吃什么？"},
   {"id": "school",            "stage": "童年",      "text": "您上过学吗？还记得学校里的事情吗？"},
   {"id": "siblings",          "stage": "童年",      "text": "您有几个兄弟姐妹？小时候你们常在一起做什么？"},
-  {"id": "hometown",          "stage": "家乡",      "text": "您年轻的时候，家乡是什么样子的？"},
+  {"id": "hometown",          "stage": "家乡",      "text": "您年轻的时候，那个时候棉竹是什么样子的？成都又是啥子样子的"},
   {"id": "festival",          "stage": "家乡",      "text": "小时候过年是怎么过的？"},
-  {"id": "young-dream",       "stage": "年轻时候",  "text": "您年轻的时候，有什么梦想？"},
-  {"id": "first-job",         "stage": "年轻时候",  "text": "您做的第一份工作是什么？"},
+  {"id": "young-dream",       "stage": "年轻时候",  "text": "您年轻的时候，最大的心愿是什么？"},
+  {"id": "first-job",         "stage": "年轻时候",  "text": "您以前是从什么时候开始下田干活的？能挣多少工分？"},
   {"id": "meet-husband",      "stage": "爱情和婚姻", "text": "您和您的丈夫是怎么认识的？"},
+  {"id": "after-marriage",    "stage": "爱情和婚姻", "text": "你和你丈夫结婚以后，日子是怎么过的？过得怎么样？"},
   {"id": "wedding",           "stage": "爱情和婚姻", "text": "您结婚那天是什么样的？"},
   {"id": "marriage-life",     "stage": "爱情和婚姻", "text": "刚结婚的时候，你们的日子是怎么过的？"},
-  {"id": "first-child",       "stage": "孩子",      "text": "第一个孩子出生的时候，您是什么心情？"},
-  {"id": "raising-kids",      "stage": "孩子",      "text": "带孩子的那些年，最难忘的是什么？"},
+  {"id": "first-child",       "stage": "孩子",      "text": "第一个孩子大姐出生的时候，您是什么心情？有什么想法？当时家里情况怎么样？"},
+  {"id": "second-child",       "stage": "孩子",      "text": "第二个孩子二姐出生的时候，您是什么心情？有什么想法？当时家里情况怎么样？"},
+  {"id": "third-child",       "stage": "孩子",      "text": "第三个孩子龙儿子出生的时候，您是什么心情？有什么想法？当时家里情况怎么样？"},
+  {"id": "raising-kids",      "stage": "孩子",      "text": "带孩子，孩子长大的那些年，最难忘的是什么？"},
   {"id": "hard-times",        "stage": "人生",      "text": "这辈子最辛苦的一段日子是什么时候？是怎么熬过来的？"},
   {"id": "proud",             "stage": "人生",      "text": "您这辈子最骄傲的一件事是什么？"},
   {"id": "unforgettable-day", "stage": "人生",      "text": "您最难忘的一天是哪一天？"},
   {"id": "advice",            "stage": "人生",      "text": "您最想对孙子孙女说的话是什么？"},
-  {"id": "wish",              "stage": "人生",      "text": "您现在最大的心愿是什么？"}
+  {"id": "wish",              "stage": "人生",      "text": "您现在最大的心愿是什么？"},
+  {"id": "regret",              "stage": "人生",      "text": "您现在最大的遗憾是什么？"}
 ];
 
 /* ===== ui-phrases.js ===== */
