@@ -1,0 +1,5 @@
+2026-09-25 14:46:37 [idb-save-failed] Error: simulated IDB failure | Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.9939.2 Chrome/152.0.7977.130 Safari/537.36 | http://localhost:8790/?demo&token=***
+2026-09-25 14:46:37 [upload-failed] TypeError: Failed to fetch | Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.9939.2 Chrome/152.0.7977.130 Safari/537.36 | http://localhost:8790/?demo&token=***
+2026-09-25 14:46:49 [curl-test] hello | curl | x
+2026-09-25 14:48:15 [idb-save-failed] Error: simulated IDB failure | Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.9939.2 Chrome/152.0.7977.130 Safari/537.36 | http://localhost:8790/?demo
+2026-09-25 14:48:22 [idb-save-failed] Error: simulated IDB failure | Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.9939.2 Chrome/152.0.7977.130 Safari/537.36 | http://localhost:8790/?demo

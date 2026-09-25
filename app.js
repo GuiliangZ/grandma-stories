@@ -9,10 +9,8 @@
   const params = new URLSearchParams(location.search);
   const DEMO = params.has('demo');          // ?demo 演示模式：不用麦克风
   try {                                     // ?server=https://...&token=... 一次性设置电脑服务器，手机会记住
-    if (params.has('server')) {
-      localStorage.setItem('serverUrl', params.get('server').trim());
-      localStorage.setItem('serverToken', (params.get('token') || '').trim());
-    }
+    if (params.has('server')) localStorage.setItem('serverUrl', params.get('server').trim());
+    if (params.has('token')) localStorage.setItem('serverToken', params.get('token').trim());
     CONFIG.serverUrl = localStorage.getItem('serverUrl') || CONFIG.serverUrl;
     CONFIG.serverToken = localStorage.getItem('serverToken') || CONFIG.serverToken;
   } catch (_) {}
@@ -23,6 +21,19 @@
   const serverBase = () => CONFIG.serverUrl.replace(/\/$/, '');
   const IN_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
   const authHeaders = () => (CONFIG.serverToken ? { 'X-Token': CONFIG.serverToken } : {});
+
+  // 把手机上出的错发给电脑记着，方便远程排查（不带口令也能发，只记几百字）
+  const errStr = (e) => (e && (e.name ? e.name + ': ' : '') + (e.message || String(e))) || 'unknown';
+  function report(kind, detail) {
+    try {
+      if (!CONFIG.serverUrl) return;
+      const body = JSON.stringify({ kind, detail: String(detail || '').slice(0, 600), ua: navigator.userAgent,
+        url: location.href.replace(/token=[^&]+/, 'token=***'), at: new Date().toISOString() });
+      fetch(serverBase() + '/api/client-log', { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
+    } catch (_) {}
+  }
+  window.addEventListener('error', (e) => report('js-error', (e.message || '') + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno));
+  window.addEventListener('unhandledrejection', (e) => report('promise-rejection', e.reason && (e.reason.stack || e.reason.message || e.reason)));
 
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -117,6 +128,7 @@
 
   // 微信里录不了音（老 iPhone、微信没给麦克风权限）：教她点右上角「···」在浏览器打开
   function micUnavailable(err) {
+    report('mic-unavailable', (err ? errStr(err) : 'unsupported') + (IN_WECHAT ? ' (wechat)' : ''));
     if (IN_WECHAT) {
       Speaker.say('open_browser');
       showMessage('微信里录不了音', '请点右上角的「···」，选「在浏览器打开」，再按一次「开始讲」');
@@ -249,13 +261,13 @@
     playbackAudio.pause();
     try { playbackAudio.currentTime = 0; } catch (_) {}
   }
-  function setupPlayer(btn, blob) {
+  function setupPlayer(btn, src) {
     stopPlayback();
     if (state.playUrl) { URL.revokeObjectURL(state.playUrl); state.playUrl = null; }
-    if (!blob) { btn.hidden = true; return; }
+    if (!src) { btn.hidden = true; return; }
     btn.hidden = false;
-    state.playUrl = URL.createObjectURL(blob);
-    playbackAudio.src = state.playUrl;
+    if (typeof src === 'string') { playbackAudio.src = src; }
+    else { state.playUrl = URL.createObjectURL(src); playbackAudio.src = state.playUrl; }
     btn.textContent = '▶️ 听一听';
     btn.onclick = async () => {
       if (playbackAudio.paused) {
@@ -287,28 +299,41 @@
   async function saveStory() {
     const q = state.current;
     const btn = $('#btn-save');
+    const label = btn.textContent;
     btn.disabled = true;
+    btn.textContent = '正在保存…';
     const story = {
       id: String(Date.now()),
       questionId: q.id, question: q.text, stage: q.stage,
       text: state.transcript.trim(), liveText: state.transcript.trim(), serverText: '',
       serverStatus: 'none', uploaded: false,
       createdAt: Date.now(), duration: state.seconds,
-      mimeType: state.blob ? state.blob.type : '', audio: state.blob,
+      mimeType: state.blob ? state.blob.type : 'audio/wav', audio: state.blob,
     };
     story.filename = `${fmtFileDate(story.createdAt)}_${q.id}.wav`;
-    try {
-      await StoryStore.save(story);
-      state.stories = await StoryStore.all();
-    } catch (e) {
-      btn.disabled = false;
-      showMessage('没存上', '手机存不下这段录音，请让家人看看');
-      return;
+    let localOk = false;
+    try { await StoryStore.save(story); localOk = true; }
+    catch (e) { report('idb-save-failed', errStr(e)); }
+    state.stories = state.stories.filter((x) => x.id !== story.id);
+    state.stories.unshift(story);                       // 存不进手机也先留在内存里
+    let uploadOk = false;
+    if (CONFIG.serverUrl) {
+      uploadOk = await uploadStory(story);
+      if (uploadOk) {
+        story.uploaded = true; story.serverStatus = 'pending';
+        if (localOk) { try { await StoryStore.save(story); } catch (_) {} }
+      }
     }
     btn.disabled = false;
+    btn.textContent = label;
+    if (!localOk && !uploadOk) {
+      showMessage('没存上', CONFIG.serverUrl ? '手机存不下，电脑也没连上。请检查网络，再按一次「保存」' : '手机存不下这段录音，请让家人看看');
+      return;
+    }
+    $('#saved-note').textContent = uploadOk ? '已经传到电脑上了' : '先存在手机里，连上电脑后会自动传过去';
     stopPlayback();
     show('saved');
-    syncSoon(300);
+    syncSoon(3000);
   }
 
   // ====== 和电脑同步：上传录音，取回电脑整理好的文字 ======
@@ -321,8 +346,9 @@
       fd.append('meta', JSON.stringify(meta));
       if (audio) fd.append('audio', audio, s.filename);
       const r = await fetch(serverBase() + '/api/stories', { method: 'POST', body: fd, headers: authHeaders() });
+      if (!r.ok) report('upload-failed', 'HTTP ' + r.status);
       return r.ok;
-    } catch (_) { return false; }
+    } catch (e) { report('upload-failed', errStr(e)); return false; }
   }
   async function fetchStatus(id) {
     try {
@@ -359,6 +385,39 @@
       }
     } catch (_) {} finally { syncing = false; }
     if (again) syncSoon(again);
+  }
+  async function refreshFromServer() {
+    if (!CONFIG.serverUrl) return false;
+    let remote = [];
+    try {
+      const r = await fetch(serverBase() + '/api/stories', { headers: authHeaders() });
+      if (!r.ok) return false;
+      remote = await r.json();
+    } catch (_) { return false; }
+    let changed = false;
+    for (const m of remote) {
+      if (!m || !m.id) continue;
+      const local = state.stories.find((x) => x.id === m.id);
+      if (local) {
+        if (!local.uploaded) { local.uploaded = true; local.serverStatus = m.status === 'done' ? 'done' : (m.status === 'failed' ? 'failed' : 'pending'); changed = true; }
+        if (m.status === 'done' && m.text && local.serverText !== m.text) {
+          local.serverText = m.text; local.text = m.text; local.serverStatus = 'done'; changed = true;
+          try { await StoryStore.save(local); } catch (_) {}
+        }
+        continue;
+      }
+      state.stories.push({
+        id: m.id, questionId: m.questionId, question: m.question || '', stage: m.stage || '',
+        createdAt: Number(m.createdAt) || 0, duration: Number(m.duration) || 0,
+        text: m.text || m.clientText || '', serverText: m.text || '',
+        serverStatus: m.status === 'done' ? 'done' : (m.status === 'failed' ? 'failed' : 'pending'),
+        uploaded: true, remote: true,
+        audioUrl: serverBase() + '/api/stories/' + encodeURIComponent(m.id) + '/audio' + (CONFIG.serverToken ? '?token=' + encodeURIComponent(CONFIG.serverToken) : ''),
+      });
+      changed = true;
+    }
+    if (changed) state.stories.sort((a, b) => b.createdAt - a.createdAt);
+    return changed;
   }
   function refreshStoryViews(s) {
     const active = document.querySelector('.screen.active');
@@ -404,7 +463,7 @@
     $('#dt-meta').textContent = `${fmtDate(s.createdAt)} · ${fmtDuration(s.duration)}`;
     $('#dt-status').textContent = statusLine(s);
     renderTranscript($('#dt-transcript'), s.text, '这段还没有整理成文字。');
-    if (!silent) setupPlayer($('#btn-detail-play'), s.audio);
+    if (!silent) setupPlayer($('#btn-detail-play'), s.audio || s.audioUrl);
     show('detail');
   }
 
@@ -435,7 +494,7 @@
   // ====== 按钮 ======
   function bind() {
     $('#btn-start').onclick = () => openQuestion(nextQuestion(null));
-    $('#btn-list').onclick = () => { renderList(); show('list'); };
+    $('#btn-list').onclick = () => { renderList(); show('list'); refreshFromServer().then((c) => { if (c) renderList(); }); };
     $('#btn-q-home').onclick = () => { renderHome(); show('home'); };
     $('#btn-replay').onclick = () => Speaker.question(state.current);
     $('#btn-record').onclick = startRecording;
@@ -460,9 +519,10 @@
       document.body.appendChild(b);
     }
     bind();
-    try { state.stories = await StoryStore.all(); } catch (_) { state.stories = []; }
+    try { state.stories = await StoryStore.all(); } catch (e) { state.stories = []; report('idb-open-failed', errStr(e)); }
     renderHome();
     show('home');
+    refreshFromServer().then(() => renderHome());
     syncSoon(1500);
   }
   init();

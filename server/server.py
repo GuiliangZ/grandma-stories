@@ -32,6 +32,7 @@ CONFIG = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 STORIES = (ROOT / (CONFIG.get("stories_dir") or "../stories")).resolve()
 STORIES.mkdir(parents=True, exist_ok=True)
 WEB = (ROOT.parent / "web").resolve()
+LOGS = ROOT / "logs"
 JOBS: "queue.Queue[pathlib.Path]" = queue.Queue()
 INDEX: dict = {}          # id -> story dir
 LOCK = threading.Lock()
@@ -42,11 +43,20 @@ def log(*a):
 
 
 def read_meta(d):
-    return json.loads((d / "meta.json").read_text(encoding="utf-8"))
+    for attempt in range(3):
+        try:
+            return json.loads((d / "meta.json").read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, FileNotFoundError):
+            if attempt == 2:
+                raise
+            time.sleep(0.05)
 
 
 def write_meta(d, meta):
-    (d / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    """先写临时文件再改名，读的一方永远看不到写了一半的文件。"""
+    tmp = d / "meta.json.tmp"
+    tmp.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(d / "meta.json")
 
 
 def load_index():
@@ -54,7 +64,7 @@ def load_index():
         try:
             m = json.loads(mp.read_text(encoding="utf-8"))
             INDEX[m["id"]] = mp.parent
-            if m.get("status") in ("pending", "working"):
+            if m.get("status") in ("pending", "working", "failed"):   # 重启服务时把没转成的都再试一次
                 JOBS.put(mp.parent)
         except Exception:
             pass
@@ -187,6 +197,12 @@ class Handler(BaseHTTPRequestHandler):
                     except Exception:
                         pass
                 return self._json(200, items)
+            m = re.match(r"^/api/stories/([A-Za-z0-9_-]+)/audio$", path)
+            if m:
+                d = INDEX.get(m.group(1))
+                if not d:
+                    return self._json(404, {"error": "not found"})
+                return self.send_file(d / read_meta(d)["audio"])
             m = re.match(r"^/api/stories/([A-Za-z0-9_-]+)$", path)
             if m:
                 d = INDEX.get(m.group(1))
@@ -196,6 +212,43 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"id": meta["id"], "status": meta["status"], "text": meta.get("text", ""), "error": meta.get("error", ""), "provider": meta.get("provider")})
             return self._json(404, {"error": "not found"})
         self.serve_static(path)
+
+    def send_file(self, f: pathlib.Path):
+        """回放录音：手机浏览器（尤其 iPhone）要求支持 Range，不然放不出来。"""
+        import mimetypes
+        if not f.is_file():
+            return self._json(404, {"error": "not found"})
+        size = f.stat().st_size
+        ctype = mimetypes.guess_type(str(f))[0] or "application/octet-stream"
+        start, end = 0, size - 1
+        rng = self.headers.get("Range")
+        m = re.match(r"bytes=(\d*)-(\d*)$", rng or "")
+        if m and (m.group(1) or m.group(2)):
+            if m.group(1):
+                start = int(m.group(1)); end = int(m.group(2)) if m.group(2) else size - 1
+            else:
+                start = max(0, size - int(m.group(2)))
+            end = min(end, size - 1)
+            if start > end:
+                self.send_response(416); self.send_header("Content-Range", f"bytes */{size}"); self.end_headers(); return
+            self.send_response(206)
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        else:
+            self.send_response(200)
+        self._cors()
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(end - start + 1))
+        self.send_header("Cache-Control", "private, max-age=3600")
+        self.end_headers()
+        with open(f, "rb") as fh:
+            fh.seek(start)
+            remaining = end - start + 1
+            while remaining > 0:
+                chunk = fh.read(min(65536, remaining))
+                if not chunk:
+                    break
+                self.wfile.write(chunk); remaining -= len(chunk)
 
     def serve_static(self, path):
         rel = path.lstrip("/") or "index.html"
@@ -212,6 +265,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if path == "/api/client-log":                  # 手机端的错误上报，不要口令，只收 4KB
+            length = int(self.headers.get("Content-Length") or 0)
+            if 0 < length <= 4096:
+                raw = self.rfile.read(length).decode("utf-8", "replace")
+                try:
+                    j = json.loads(raw)
+                    line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} [{j.get('kind')}] {j.get('detail')} | {j.get('ua')} | {j.get('url')}"
+                except Exception:
+                    line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} [raw] {raw[:600]}"
+                LOGS.mkdir(exist_ok=True)
+                with open(LOGS / "client.log", "a", encoding="utf-8") as fh:
+                    fh.write(line + "\n")
+                log("手机上报", line[:200])
+            return self._json(204 if False else 200, {"ok": True})
         if path != "/api/stories":
             return self._json(404, {"error": "not found"})
         if not self._authed():
@@ -228,20 +295,23 @@ class Handler(BaseHTTPRequestHandler):
             filename, data = files["audio"]
         except Exception as e:
             return self._json(400, {"error": f"bad upload: {e}"})
-        sid = safe(meta.get("id") or "")
+        if not meta.get("id"):
+            meta["id"] = str(int(time.time() * 1000))
+        sid = safe(meta["id"])
         existing = INDEX.get(sid)
         if existing and read_meta(existing).get("status") in ("done", "working", "pending"):
             m = read_meta(existing)
             return self._json(200, {"id": sid, "status": m["status"], "dup": True})
         d = save_story(meta, filename, data)
-        JOBS.put(d)
         log("收到录音", d.name, f"{len(data) // 1024} KB", (meta.get("question") or "")[:20])
-        return self._json(201, {"id": read_meta(d)["id"], "status": "pending"})
+        self._json(201, {"id": sid, "status": "pending"})
+        JOBS.put(d)                                    # 先答复手机，再排队转写
 
     def log_message(self, fmt, *args):
-        if "/api/stories/" in fmt % args:      # 轮询太多，不刷屏
+        msg = fmt % args
+        if "/api/stories/" in msg and "/audio" not in msg:      # 轮询太多，不刷屏
             return
-        log(self.address_string(), fmt % args)
+        log(self.address_string(), msg)
 
 
 def main():
