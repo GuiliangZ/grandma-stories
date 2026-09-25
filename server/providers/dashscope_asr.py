@@ -7,8 +7,11 @@ config.json 里：
     "api_key": "sk-...",                    # 百炼控制台 → API-KEY。北京 / 新加坡 / 美国 的 Key 不通用
     "model":   "paraformer-realtime-v2",    # 见下
     "region":  "beijing",                   # beijing | singapore | us
-    "workspace_id": ""                      # 可选；美国地域必填（百炼控制台的业务空间 ID）
+    "workspace_id": ""                      # key 是 sk-ws- 开头（业务空间里创建的）就必须填，形如 ws-xxxxxxxx；美国地域也必填
   }
+
+怎么找 workspace_id：控制台里该业务空间的接入地址形如 https://ws-xxxxxxxx.ap-southeast-1.maas.aliyuncs.com，
+ws-xxxxxxxx 就是。sk-ws- 开头的 key 走旧域名会报 AccessDenied.Unpurchased（看起来像没开通，其实是走错了业务空间）。
 
 两种模型：
   paraformer-realtime-v2  只在【北京】地域。本地文件直接流式识别，时长不限，四川话在 zh 里。

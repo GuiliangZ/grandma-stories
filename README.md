@@ -98,7 +98,7 @@ grandma-stories/
 | provider | 模型 | 四川话 | 长录音 | 需要什么 | 说明 |
 |---|---|---|---|---|---|
 | `dashscope` | `paraformer-realtime-v2` | ✅ 官方列出 | ✅ 时长不限 | 阿里云百炼 **北京地域** API Key | 本地文件直接识别，首选。中国站账号；免费额度每月 10 小时，用免费额度不需要实名，超出按量付费才要实名。 |
-| `dashscope` | `qwen3-asr-flash` | ✅ 官方列出 | 单次 ≤5 分钟，程序自动按静音切段 | 百炼 API Key，北京 / 新加坡 / 美国地域都有 | **海外账号（alibabacloud.com）可用**，`region` 填 `singapore`；美国地域要填 `workspace_id`。 |
+| `dashscope` | `qwen3-asr-flash` | ✅ 官方列出 | 单次 ≤5 分钟，程序自动按静音切段 | 百炼 API Key，北京 / 新加坡 / 美国地域都有 | **海外账号（alibabacloud.com）可用**，`region` 填 `singapore`。key 是 `sk-ws-` 开头的（业务空间里建的）必须同时填 `workspace_id`（控制台接入地址 `https://ws-xxxx.ap-southeast-1.maas.aliyuncs.com` 里的 `ws-xxxx`），否则会报 `AccessDenied.Unpurchased`。目前实际在用的就是这个。 |
 | `baidu` | 短语音识别 `dev_pid=1837` | ✅ 四川话专用模型 | 单次 ≤60 秒，程序切成 55 秒段 | 百度智能云 API Key + Secret Key | 个人认证只认大陆身份证 / 外国人永久居留证 / 定居国外的中国公民护照 / 港澳台通行证。四川话免费 3 万次（10 分钟录音约 12 次）。 |
 | `whisper` | faster-whisper | ❌ 只认普通话 | ✅ | `pip install faster-whisper`，离线 | 没网时兜底，四川话会错很多。 |
 | `none` | – | – | – | – | 只存录音不转文字（默认）。 |
