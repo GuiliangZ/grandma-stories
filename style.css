@@ -88,6 +88,7 @@ body {
 .btn.secondary { background: var(--card); color: var(--text); border: 3px solid var(--line); box-shadow: 0 6px 0 var(--line); }
 .btn.text { background: transparent; color: var(--muted); box-shadow: none; min-height: 72px; font-size: 26px; font-weight: 500; }
 .btn.text:active { transform: none; }
+.btn.text.danger { color: var(--primary); }
 .btn[hidden] { display: none; }
 
 /* ---------- 录音中：内容压紧一点，保证「讲完了」不用滚动就能看到 ---------- */
@@ -156,3 +157,12 @@ body {
 }
 .modal-box h2 { font-size: 32px; margin: 0; }
 .modal-box p { font-size: 26px; margin: 0; color: var(--muted); }
+
+/* ---------- 选人 / 输名字 ---------- */
+.bigfield {
+  width: 100%; font: inherit; font-size: 34px; font-weight: 700; text-align: center;
+  padding: 18px 16px; border: 3px solid var(--line); border-radius: 20px; background: var(--card); color: var(--text);
+  -webkit-user-select: text; user-select: text;
+}
+.bigfield:focus { outline: none; border-color: var(--blue); }
+.card.user { font-size: 34px; font-weight: 800; text-align: center; padding: 26px 20px; }

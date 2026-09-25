@@ -10,8 +10,38 @@
 </head>
 <body>
 
+  <!-- 选人：第一次打开，或者点「换人」 -->
+  <section class="screen" id="screen-user">
+    <div class="grow">
+      <h1 class="greeting center-text">请问您是哪一位？</h1>
+      <p class="sub center-text">点自己的名字，或者新建一个</p>
+      <div class="stack" id="user-list"></div>
+      <p class="empty-note" id="user-empty" hidden>还没有人用过，先新建一个名字吧</p>
+    </div>
+    <div class="stack">
+      <button class="btn primary" id="btn-user-new" type="button" data-say="new_user">➕ 新建我的名字</button>
+    </div>
+  </section>
+
+  <!-- 新建名字 -->
+  <section class="screen" id="screen-user-new">
+    <div class="topbar"><button class="back" id="btn-user-new-back" type="button" data-say="back">‹ 返回</button></div>
+    <div class="grow center">
+      <h1 class="greeting">请输入您的名字</h1>
+      <input class="bigfield" id="user-name-input" type="text" maxlength="12" placeholder="比如：奶奶" autocomplete="off">
+      <p class="status" id="user-name-error"></p>
+    </div>
+    <div class="stack">
+      <button class="btn green" id="btn-user-create" type="button" data-say="ok">✅ 好了</button>
+    </div>
+  </section>
+
   <!-- 首页 -->
   <section class="screen active" id="screen-home">
+    <div class="topbar">
+      <span class="tag" id="home-user"></span>
+      <button class="back" id="btn-switch-user" type="button" data-say="switch_user">换人 ›</button>
+    </div>
     <div class="grow center">
       <div class="hero">👵</div>
       <h1 class="greeting"><span class="name">奶奶</span>，您好</h1>
@@ -102,6 +132,7 @@
     <p class="status" id="dt-status"></p>
     <button class="btn secondary" id="btn-detail-play" type="button">▶️ 听一听</button>
     <div class="transcript" id="dt-transcript"></div>
+    <button class="btn text danger" id="btn-detail-delete" type="button" data-say="delete">🗑️ 删掉这段录音</button>
   </section>
 
   <!-- 大字弹窗 -->
@@ -116,6 +147,6 @@
 
   <audio id="prompt-audio" preload="auto"></audio>
   <audio id="playback-audio"></audio>
-  <script src="bundle.js?v=a5295108ba"></script>
+  <script src="bundle.js?v=0033fda325"></script>
 </body>
 </html>

@@ -20,5 +20,12 @@ window.UI_PHRASES = {
   "open":      "打开这个故事",
   "ok":        "好",
   "mic_error": "没有听到声音，请允许使用麦克风",
-  "open_browser": "请点右上角的三个点，选在浏览器打开，再试一次"
+  "open_browser": "请点右上角的三个点，选在浏览器打开，再试一次",
+  "delete":       "要删掉这段录音吗",
+  "deleted":      "好，删掉了",
+  "keep":         "好，留着",
+  "pick_user":    "请问您是哪一位",
+  "new_user":     "请输入您的名字",
+  "switch_user":  "换一个人",
+  "hello":        "您好，我们开始吧"
 };

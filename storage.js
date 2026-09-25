@@ -55,9 +55,9 @@ window.StoryStore = (() => {
       if (audio) { rec.audioBuf = await toBuffer(audio); rec.mimeType = rec.mimeType || audio.type || 'audio/wav'; }
       return run('readwrite', (s) => s.put(rec));
     },
-    async all() {
+    async all(userId) {
       const list = (await run('readonly', (s) => s.getAll())) || [];
-      return list.map(hydrate).sort((a, b) => b.createdAt - a.createdAt);
+      return list.map(hydrate).filter((r) => !userId || r.user === userId).sort((a, b) => b.createdAt - a.createdAt);
     },
     remove: (id) => run('readwrite', (s) => s.delete(id)),
   };

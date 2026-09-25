@@ -36,6 +36,20 @@ LOGS = ROOT / "logs"
 JOBS: "queue.Queue[pathlib.Path]" = queue.Queue()
 INDEX: dict = {}          # id -> story dir
 LOCK = threading.Lock()
+USERS_PATH = STORIES / "users.json"
+
+
+def load_users():
+    try:
+        return json.loads(USERS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def save_users(users):
+    tmp = USERS_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(USERS_PATH)
 
 
 def log(*a):
@@ -60,7 +74,10 @@ def write_meta(d, meta):
 
 
 def load_index():
-    for mp in STORIES.glob("*/meta.json"):
+    paths = list(STORIES.glob("*/*/meta.json")) + list(STORIES.glob("*/meta.json"))   # 按用户分目录；也兼容早期的单层目录
+    for mp in paths:
+        if "_deleted" in mp.parts:
+            continue
         try:
             m = json.loads(mp.read_text(encoding="utf-8"))
             INDEX[m["id"]] = mp.parent
@@ -108,16 +125,19 @@ def save_story(meta: dict, filename: str, data: bytes) -> pathlib.Path:
     sid = safe(meta.get("id") or int(time.time() * 1000))
     ts = time.localtime((meta.get("createdAt") or time.time() * 1000) / 1000)
     base = f"{time.strftime('%Y-%m-%d_%H%M', ts)}_{safe(meta.get('questionId') or 'q', 40)}"
-    d = STORIES / base
+    udir = STORIES / safe(meta.get("user") or "default")
+    udir.mkdir(parents=True, exist_ok=True)
+    d = udir / base
     i = 2
     while d.exists() and (not (d / "meta.json").exists() or read_meta(d).get("id") != sid):
-        d = STORIES / f"{base}_{i}"; i += 1
+        d = udir / f"{base}_{i}"; i += 1
     d.mkdir(parents=True, exist_ok=True)
     ext = pathlib.Path(filename).suffix.lower() or ".wav"
     audio = d / f"audio{ext}"
     audio.write_bytes(data)
     m = {
         "id": sid,
+        "user": safe(meta.get("user") or "default"), "userName": str(meta.get("userName") or "")[:40],
         "questionId": meta.get("questionId"), "question": meta.get("question"), "stage": meta.get("stage"),
         "createdAt": meta.get("createdAt"), "duration": meta.get("duration"),
         "clientText": meta.get("liveText") or meta.get("text") or "",
@@ -168,7 +188,7 @@ class Handler(BaseHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Token")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 
     def _json(self, code, obj):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -197,11 +217,17 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/"):
             if not self._authed():
                 return self._json(401, {"error": "bad token"})
+            if path == "/api/users":
+                return self._json(200, load_users())
             if path == "/api/stories":
+                want = parse_qs(urlparse(self.path).query).get("user", [""])[0]
                 items = []
                 for d in sorted(INDEX.values(), reverse=True):
                     try:
-                        m = read_meta(d); m["dir"] = d.name; items.append(m)
+                        m = read_meta(d)
+                        if want and (m.get("user") or "default") != want:
+                            continue
+                        m["dir"] = d.name; items.append(m)
                     except Exception:
                         pass
                 return self._json(200, items)
@@ -290,6 +316,28 @@ class Handler(BaseHTTPRequestHandler):
                     fh.write(line + "\n")
                 log("手机上报", line[:200])
             return self._json(204 if False else 200, {"ok": True})
+        if path == "/api/users":                       # 新建用户（同名就返回已有的）
+            if not self._authed():
+                return self._json(401, {"error": "bad token"})
+            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                body = json.loads(self.rfile.read(length).decode("utf-8")) if 0 < length <= 4096 else {}
+            except Exception:
+                body = {}
+            name = " ".join(str(body.get("name") or "").split())[:12]
+            if not name:
+                return self._json(400, {"error": "name required"})
+            with LOCK:
+                users = load_users()
+                for u in users:
+                    if u["name"] == name:
+                        return self._json(200, u)
+                import secrets
+                u = {"id": "u" + secrets.token_hex(4), "name": name, "createdAt": time.strftime("%Y-%m-%d %H:%M:%S")}
+                users.append(u)
+                save_users(users)
+            log("新建用户", u["id"], name)
+            return self._json(201, u)
         if path != "/api/stories":
             return self._json(404, {"error": "not found"})
         if not self._authed():
@@ -317,6 +365,25 @@ class Handler(BaseHTTPRequestHandler):
         log("收到录音", d.name, f"{len(data) // 1024} KB", (meta.get("question") or "")[:20])
         self._json(201, {"id": sid, "status": "pending"})
         JOBS.put(d)                                    # 先答复手机，再排队转写
+
+    def do_DELETE(self):
+        path = urlparse(self.path).path
+        m = re.match(r"^/api/stories/([A-Za-z0-9_-]+)$", path)
+        if not m:
+            return self._json(404, {"error": "not found"})
+        if not self._authed():
+            return self._json(401, {"error": "bad token"})
+        with LOCK:
+            d = INDEX.pop(m.group(1), None)
+        if d and d.exists():
+            trash = STORIES / "_deleted"
+            trash.mkdir(exist_ok=True)
+            target, i = trash / d.name, 2
+            while target.exists():
+                target = trash / f"{d.name}_{i}"; i += 1
+            d.rename(target)
+            log("已删除（移到 _deleted，可找回）", d.name)
+        return self._json(200, {"ok": True})
 
     def log_message(self, fmt, *args):
         msg = fmt % args

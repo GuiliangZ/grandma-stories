@@ -1,4 +1,4 @@
-/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=a5295108ba */
+/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=0033fda325 */
 /* ===== config.js ===== */
 // ====== 这里是可以改的设置 ======
 window.APP_CONFIG = {
@@ -67,7 +67,14 @@ window.UI_PHRASES = {
   "open":      "打开这个故事",
   "ok":        "好",
   "mic_error": "没有听到声音，请允许使用麦克风",
-  "open_browser": "请点右上角的三个点，选在浏览器打开，再试一次"
+  "open_browser": "请点右上角的三个点，选在浏览器打开，再试一次",
+  "delete":       "要删掉这段录音吗",
+  "deleted":      "好，删掉了",
+  "keep":         "好，留着",
+  "pick_user":    "请问您是哪一位",
+  "new_user":     "请输入您的名字",
+  "switch_user":  "换一个人",
+  "hello":        "您好，我们开始吧"
 };
 
 /* ===== storage.js ===== */
@@ -128,9 +135,9 @@ window.StoryStore = (() => {
       if (audio) { rec.audioBuf = await toBuffer(audio); rec.mimeType = rec.mimeType || audio.type || 'audio/wav'; }
       return run('readwrite', (s) => s.put(rec));
     },
-    async all() {
+    async all(userId) {
       const list = (await run('readonly', (s) => s.getAll())) || [];
-      return list.map(hydrate).sort((a, b) => b.createdAt - a.createdAt);
+      return list.map(hydrate).filter((r) => !userId || r.user === userId).sort((a, b) => b.createdAt - a.createdAt);
     },
     remove: (id) => run('readwrite', (s) => s.delete(id)),
   };
@@ -348,6 +355,7 @@ window.WavRecorder = (() => {
   Speaker.configure({ uiDir: CONFIG.uiAudioDir, questionDir: CONFIG.questionAudioDir, phrases: window.UI_PHRASES || {} });
 
   const state = {
+    user: null,                                  // {id, name}：当前是谁在用
     stories: [], current: null, detailId: null,
     blob: null, seconds: 0, timer: null, recording: false, paused: false,
     recognition: null, transcript: '', sessionFinal: '', interim: '',
@@ -397,6 +405,71 @@ window.WavRecorder = (() => {
     const b = e.target.closest('[data-say]');
     if (b && !b.disabled) Speaker.say(b.dataset.say);
   }, true);
+
+  // ====== 用户：第一次打开先选人 / 新建名字；所有录音都归到这个人名下 ======
+  function loadUser() { try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch (_) { return null; } }
+  function saveUser(u) { try { localStorage.setItem('user', JSON.stringify(u)); } catch (_) {} }
+  function localUsers() { try { return JSON.parse(localStorage.getItem('users') || '[]'); } catch (_) { return []; } }
+  function rememberLocalUser(u) { const list = localUsers().filter((x) => x.id !== u.id); list.unshift(u); try { localStorage.setItem('users', JSON.stringify(list)); } catch (_) {} }
+  async function fetchUsers() {
+    if (!CONFIG.serverUrl) return localUsers();
+    try {
+      const r = await fetch(serverBase() + '/api/users', { headers: authHeaders() });
+      if (r.ok) return await r.json();
+    } catch (_) {}
+    return localUsers();
+  }
+  async function createUser(name) {
+    if (CONFIG.serverUrl) {
+      try {
+        const r = await fetch(serverBase() + '/api/users', { method: 'POST', body: JSON.stringify({ name }), headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()) });
+        if (r.ok) return await r.json();
+        report('create-user-failed', 'HTTP ' + r.status);
+      } catch (e) { report('create-user-failed', errStr(e)); }
+    }
+    // 电脑没连上：先在手机上建一个，id 用名字算出来，以后同名会合并
+    let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return { id: 'u' + h.toString(16), name };
+  }
+  async function showUserScreen() {
+    Speaker.stop();
+    const box = $('#user-list');
+    box.innerHTML = '';
+    show('user');
+    const users = await fetchUsers();
+    $('#user-empty').hidden = users.length > 0;
+    users.forEach((u) => {
+      const b = document.createElement('button');
+      b.className = 'card user'; b.type = 'button'; b.textContent = u.name; b.dataset.say = 'hello';
+      b.onclick = () => selectUser(u);
+      box.appendChild(b);
+    });
+  }
+  async function selectUser(u) {
+    state.user = u;
+    saveUser(u);
+    rememberLocalUser(u);
+    $$('.name').forEach((el) => { el.textContent = u.name; });
+    $('#home-user').textContent = '现在是：' + u.name;
+    try { state.stories = await StoryStore.all(u.id); } catch (e) { state.stories = []; report('idb-open-failed', errStr(e)); }
+    renderHome();
+    show('home');
+    refreshFromServer().then(() => renderHome());
+    syncSoon(1000);
+  }
+  async function submitNewUser() {
+    const input = $('#user-name-input');
+    const name = (input.value || '').trim().replace(/\s+/g, ' ');
+    const err = $('#user-name-error');
+    if (!name) { err.textContent = '请先输入名字'; input.focus(); return; }
+    if (name.length > 12) { err.textContent = '名字太长了，12 个字以内'; return; }
+    err.textContent = '';
+    const btn = $('#btn-user-create'); btn.disabled = true;
+    const u = await createUser(name);
+    btn.disabled = false;
+    input.value = '';
+    selectUser(u);
+  }
 
   // ====== 选问题：先问没讲过的，都讲过了就从头再来 ======
   function nextQuestion(after) {
@@ -610,7 +683,8 @@ window.WavRecorder = (() => {
     btn.disabled = true;
     btn.textContent = '正在保存…';
     const story = {
-      id: String(Date.now()),
+      id: (state.user ? state.user.id + '-' : '') + String(Date.now()),
+      user: state.user ? state.user.id : '', userName: state.user ? state.user.name : '',
       questionId: q.id, question: q.text, stage: q.stage,
       text: state.transcript.trim(), liveText: state.transcript.trim(), serverText: '',
       serverStatus: 'none', uploaded: false,
@@ -666,6 +740,7 @@ window.WavRecorder = (() => {
   async function syncNow() {
     if (syncing || !CONFIG.serverUrl) return;
     syncing = true;
+    await flushPendingDeletes();
     let again = 0;
     try {
       for (const s of state.stories) {
@@ -697,13 +772,15 @@ window.WavRecorder = (() => {
     if (!CONFIG.serverUrl) return false;
     let remote = [];
     try {
-      const r = await fetch(serverBase() + '/api/stories', { headers: authHeaders() });
+      if (!state.user) return false;
+      const r = await fetch(serverBase() + '/api/stories?user=' + encodeURIComponent(state.user.id), { headers: authHeaders() });
       if (!r.ok) return false;
       remote = await r.json();
     } catch (_) { return false; }
     let changed = false;
+    const skip = new Set(pendingDeletes());
     for (const m of remote) {
-      if (!m || !m.id) continue;
+      if (!m || !m.id || skip.has(m.id)) continue;
       const local = state.stories.find((x) => x.id === m.id);
       if (local) {
         if (!local.uploaded) { local.uploaded = true; local.serverStatus = m.status === 'done' ? 'done' : (m.status === 'failed' ? 'failed' : 'pending'); changed = true; }
@@ -714,7 +791,7 @@ window.WavRecorder = (() => {
         continue;
       }
       state.stories.push({
-        id: m.id, questionId: m.questionId, question: m.question || '', stage: m.stage || '',
+        id: m.id, user: m.user || '', userName: m.userName || '', questionId: m.questionId, question: m.question || '', stage: m.stage || '',
         createdAt: Number(m.createdAt) || 0, duration: Number(m.duration) || 0,
         text: m.text || m.clientText || '', serverText: m.text || '',
         serverStatus: m.status === 'done' ? 'done' : (m.status === 'failed' ? 'failed' : 'pending'),
@@ -725,6 +802,34 @@ window.WavRecorder = (() => {
     }
     if (changed) state.stories.sort((a, b) => b.createdAt - a.createdAt);
     return changed;
+  }
+  // ====== 删除已保存的录音：手机上删掉，电脑上移到 _deleted（可找回）======
+  function pendingDeletes() { try { return JSON.parse(localStorage.getItem('pendingDeletes') || '[]'); } catch (_) { return []; } }
+  function setPendingDeletes(list) { try { localStorage.setItem('pendingDeletes', JSON.stringify(list)); } catch (_) {} }
+  async function deleteOnServer(id) {
+    if (!CONFIG.serverUrl) return true;
+    try {
+      const r = await fetch(serverBase() + '/api/stories/' + encodeURIComponent(id), { method: 'DELETE', headers: authHeaders() });
+      return r.ok || r.status === 404;
+    } catch (e) { report('delete-failed', errStr(e)); return false; }
+  }
+  async function deleteStory(s) {
+    const yes = await ask('真的要删掉这段吗？', '删掉以后手机上就没有了', '删掉', '不删，留着', 'deleted', 'keep');
+    if (!yes) return;
+    stopPlayback();
+    try { await StoryStore.remove(s.id); } catch (_) {}
+    state.stories = state.stories.filter((x) => x.id !== s.id);
+    if (!(await deleteOnServer(s.id))) setPendingDeletes([...new Set([...pendingDeletes(), s.id])]);
+    renderHome();
+    renderList();
+    show('list');
+  }
+  async function flushPendingDeletes() {
+    const list = pendingDeletes();
+    if (!list.length || !CONFIG.serverUrl) return;
+    const left = [];
+    for (const id of list) { if (!(await deleteOnServer(id))) left.push(id); }
+    setPendingDeletes(left);
   }
   function refreshStoryViews(s) {
     const active = document.querySelector('.screen.active');
@@ -801,6 +906,11 @@ window.WavRecorder = (() => {
   // ====== 按钮 ======
   function bind() {
     $('#btn-start').onclick = () => openQuestion(nextQuestion(null));
+    $('#btn-switch-user').onclick = showUserScreen;
+    $('#btn-user-new').onclick = () => { $('#user-name-error').textContent = ''; show('user-new'); setTimeout(() => $('#user-name-input').focus(), 300); };
+    $('#btn-user-new-back').onclick = showUserScreen;
+    $('#btn-user-create').onclick = submitNewUser;
+    $('#user-name-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitNewUser(); } });
     $('#btn-list').onclick = () => { renderList(); show('list'); refreshFromServer().then((c) => { if (c) renderList(); }); };
     $('#btn-q-home').onclick = () => { renderHome(); show('home'); };
     $('#btn-replay').onclick = () => Speaker.question(state.current);
@@ -814,6 +924,7 @@ window.WavRecorder = (() => {
     $('#btn-home-2').onclick = () => { renderHome(); show('home'); };
     $('#btn-list-back').onclick = () => { stopPlayback(); renderHome(); show('home'); };
     $('#btn-detail-back').onclick = () => { stopPlayback(); renderList(); show('list'); };
+    $('#btn-detail-delete').onclick = () => { const s = state.stories.find((x) => x.id === state.detailId); if (s) deleteStory(s); };
     document.addEventListener('visibilitychange', () => { if (!document.hidden) syncSoon(500); });
   }
 
@@ -840,11 +951,9 @@ window.WavRecorder = (() => {
       document.body.appendChild(b);
     }
     bind();
-    try { state.stories = await StoryStore.all(); } catch (e) { state.stories = []; report('idb-open-failed', errStr(e)); }
-    renderHome();
-    show('home');
-    refreshFromServer().then(() => renderHome());
-    syncSoon(1500);
+    const u = loadUser();
+    if (u && u.id) { await selectUser(u); }
+    else { showUserScreen(); }
   }
   init();
 })();
