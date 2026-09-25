@@ -138,7 +138,15 @@ def worker():
             meta["status"] = "working"; write_meta(d, meta)
             log("转写开始", d.name, "provider=", CONFIG.get("provider"))
             wav = audio_tools.ensure_wav16k(d / meta["audio"])
-            text = transcribe.transcribe(str(wav), CONFIG)
+            text, last = None, None
+            for attempt in range(3):                      # 网络抖动就重试，别轻易标失败
+                try:
+                    text = transcribe.transcribe(str(wav), CONFIG); break
+                except Exception as e:
+                    last = e; log("转写出错，重试", d.name, f"第{attempt + 1}次", repr(e)[:160])
+                    time.sleep(5 * (attempt + 1))
+            if text is None:
+                raise last
             meta.update(status="done", text=text, provider=CONFIG.get("provider"),
                         transcribedAt=time.strftime("%Y-%m-%d %H:%M:%S"), error="")
             write_meta(d, meta)
@@ -260,7 +268,10 @@ class Handler(BaseHTTPRequestHandler):
         data = f.read_bytes()
         self.send_response(200); self._cors()
         self.send_header("Content-Type", ctype + ("; charset=utf-8" if ctype.startswith("text/") or ctype.endswith("javascript") else ""))
-        self.send_header("Content-Length", str(len(data))); self.send_header("Cache-Control", "no-cache"); self.end_headers()
+        self.send_header("Content-Length", str(len(data)))
+        # 页面和脚本一律不缓存：微信 iOS 会把脚本缓存住甚至缓存坏的，导致"找不到 StoryStore"这类错
+        self.send_header("Cache-Control", "no-store, must-revalidate" if f.suffix in (".html", ".js", ".css") else "public, max-age=86400")
+        self.end_headers()
         self.wfile.write(data)
 
     def do_POST(self):
@@ -315,6 +326,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    try:
+        import subprocess
+        subprocess.run([sys.executable, str(ROOT.parent / "make_bundle.py")], check=True, timeout=30)
+    except Exception as e:
+        log("生成 bundle.js 失败（继续用现有的）", repr(e)[:120])
     load_index()
     threading.Thread(target=worker, daemon=True).start()
     port = int(CONFIG.get("port") or 8790)

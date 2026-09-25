@@ -69,7 +69,11 @@ def _paraformer_realtime(dashscope, model, wav_path):
 
 
 def _qwen_flash_once(dashscope, model, wav_path):
-    messages = [{"role": "user", "content": [{"audio": "file://" + str(pathlib.Path(wav_path).resolve())}]}]
+    # 用 Base64 直接放在请求里（官方支持），不走 SDK 的"本地文件先传到 OSS 中转"那条路：少一跳网络，也没有 100 QPS 的限制
+    import base64
+    data = pathlib.Path(wav_path).read_bytes()
+    audio = "data:audio/wav;base64," + base64.b64encode(data).decode("ascii")
+    messages = [{"role": "user", "content": [{"audio": audio}]}]
     resp = dashscope.MultiModalConversation.call(
         model=model, messages=messages, result_format="message",
         asr_options={"language": "zh", "enable_itn": False},   # zh 包含普通话、四川话、闽南语、吴语
@@ -83,12 +87,12 @@ def _qwen_flash_once(dashscope, model, wav_path):
 
 
 def _qwen_flash(dashscope, model, wav_path):
-    # 单次最多 5 分钟 / 10MB：超过就按静音切段，逐段识别再拼起来
-    if audio_tools.duration_seconds(wav_path) <= 280:
+    # 单次上限 5 分钟 / 10MB（Base64 之后），16kHz WAV 每秒 32KB：≤200 秒一段最稳妥；长录音按静音切段再拼
+    if audio_tools.duration_seconds(wav_path) <= 200:
         return _qwen_flash_once(dashscope, model, wav_path)
     texts = []
     with tempfile.TemporaryDirectory() as tmp:
-        for i, (a, b, pcm) in enumerate(audio_tools.split_on_silence(wav_path, max_seconds=270, min_seconds=120)):
+        for i, (a, b, pcm) in enumerate(audio_tools.split_on_silence(wav_path, max_seconds=200, min_seconds=90)):
             piece = pathlib.Path(tmp) / f"part{i:03d}.wav"
             piece.write_bytes(audio_tools.pcm_to_wav_bytes(pcm))
             texts.append(_qwen_flash_once(dashscope, model, piece))
