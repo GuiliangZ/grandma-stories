@@ -5,7 +5,8 @@ config.json 里：
   "provider": "baidu",
   "baidu": { "api_key": "...", "secret_key": "...", "dev_pid": 1837 }
 密钥：百度智能云控制台 → 语音技术 → 应用列表 → 创建应用，拿 API Key / Secret Key。
-需要百度智能云账号并完成实名认证；四川话个人认证有 3 万次免费额度（长期有效）。
+需要百度智能云账号并完成实名认证（个人认证只认大陆身份证、外国人永久居留证、定居国外的中国公民护照、港澳台通行证）；
+四川话个人认证有 3 万次免费额度（长期有效），一段 10 分钟的录音约 12 次。
 
 限制：每次请求 ≤60 秒、16kHz 16bit 单声道。程序会把长录音按静音切成 ≤55 秒的段，逐段识别再拼起来。
 只用标准库，不用 pip 装东西。
@@ -14,6 +15,7 @@ import base64
 import json
 import os
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
@@ -28,7 +30,7 @@ ERRORS = {
     3300: "输入参数不正确", 3301: "音频质量过差", 3302: "鉴权失败（Key/Secret 不对，或额度、并发超限）",
     3303: "百度服务器繁忙", 3304: "并发超限", 3305: "当日调用量超限", 3307: "识别服务错误",
     3308: "音频过长（>60s）", 3309: "音频数据问题", 3310: "音频文件过大", 3311: "采样率不对（要 16000）",
-    3312: "音频格式不对",
+    3312: "音频格式不对", 3313: "语音服务器后端识别错误", 3314: "音频太短", 3315: "语音服务器后端识别错误",
 }
 
 
@@ -48,8 +50,14 @@ def get_token(cfg):
         raise RuntimeError("baidu.api_key / secret_key 没填（config.json → baidu）")
     q = urllib.parse.urlencode({"grant_type": "client_credentials", "client_id": ak, "client_secret": sk})
     req = urllib.request.Request(TOKEN_URL + "?" + q, data=b"", method="POST")
-    with urllib.request.urlopen(req, timeout=30) as r:
-        j = json.loads(r.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            j = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:            # 401 时百度把原因放在 JSON 里
+        try:
+            j = json.loads(e.read().decode("utf-8"))
+        except Exception:
+            raise RuntimeError(f"百度取 token 失败：HTTP {e.code}") from e
     if "access_token" not in j:
         raise RuntimeError(f"百度取 token 失败：{j.get('error')} {j.get('error_description')}")
     _token.update(value=j["access_token"], expires_at=time.time() + int(j.get("expires_in", 2592000)))
@@ -71,7 +79,7 @@ def recognize_pcm(pcm: bytes, cfg) -> str:
         err = res.get("err_no", 0)
         if err == 0:
             return "".join(res.get("result") or [])
-        if err in (3303, 3304) and attempt < 2:          # 繁忙/并发：歇一下重试
+        if err in (3303, 3304, 3313, 3315) and attempt < 2:   # 繁忙/并发/服务端异常：歇一下重试
             time.sleep(2 + attempt * 3)
             continue
         if err == 3301:                                  # 这一段太安静/听不清，跳过

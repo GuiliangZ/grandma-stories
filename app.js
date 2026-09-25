@@ -21,6 +21,7 @@
     CONFIG.serverUrl = location.origin;
   }
   const serverBase = () => CONFIG.serverUrl.replace(/\/$/, '');
+  const IN_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
   const authHeaders = () => (CONFIG.serverToken ? { 'X-Token': CONFIG.serverToken } : {});
 
   const $ = (s) => document.querySelector(s);
@@ -114,6 +115,20 @@
     if (state.wakeLock) { state.wakeLock.release().catch(() => {}); state.wakeLock = null; }
   }
 
+  // 微信里录不了音（老 iPhone、微信没给麦克风权限）：教她点右上角「···」在浏览器打开
+  function micUnavailable(err) {
+    if (IN_WECHAT) {
+      Speaker.say('open_browser');
+      showMessage('微信里录不了音', '请点右上角的「···」，选「在浏览器打开」，再按一次「开始讲」');
+    } else if (err && /NotAllowed|Permission|denied/i.test(String(err && err.name) + String(err && err.message))) {
+      Speaker.say('mic_error');
+      showMessage('没有听到声音', '请允许使用麦克风，然后再按一次「开始讲」');
+    } else {
+      Speaker.say('mic_error');
+      showMessage('这个手机暂时不能录音', '请让家人帮忙看看，换个浏览器打开');
+    }
+  }
+
   async function startRecording() {
     const q = state.current;
     const recBtn = $('#btn-record');
@@ -122,9 +137,7 @@
 
     if (!DEMO) {
       if (!WavRecorder.supported()) {
-        Speaker.say('mic_error');
-        showMessage('这个手机暂时不能录音', '请让家人帮忙看看，换个方式打开');
-        return;
+        micUnavailable(); return;
       }
       WavRecorder.ensureContext();                 // 必须在点按里同步创建（iPhone 要求）
       recBtn.disabled = true;
@@ -132,9 +145,7 @@
       try {
         await WavRecorder.open();
       } catch (e) {
-        Speaker.say('mic_error');
-        showMessage('没有听到声音', '请允许使用麦克风，然后再按一次「开始讲」');
-        return;
+        micUnavailable(e); return;
       } finally {
         recBtn.disabled = false;
         recBtn.textContent = '🎙️ 按这里，开始讲';

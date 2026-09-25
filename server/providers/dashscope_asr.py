@@ -6,7 +6,8 @@ config.json 里：
   "dashscope": {
     "api_key": "sk-...",                    # 百炼控制台 → API-KEY。北京 / 新加坡 / 美国 的 Key 不通用
     "model":   "paraformer-realtime-v2",    # 见下
-    "region":  "beijing"                    # beijing | singapore | us
+    "region":  "beijing",                   # beijing | singapore | us
+    "workspace_id": ""                      # 可选；美国地域必填（百炼控制台的业务空间 ID）
   }
 
 两种模型：
@@ -15,6 +16,8 @@ config.json 里：
   qwen3-asr-flash         北京 / 新加坡 / 美国 都有。单次 ≤5 分钟 ≤10MB，程序会自动按静音切成 ≤4.5 分钟的段。
                           海外账号（alibabacloud.com，新加坡地域）也能开通，适合人在国外。
 pip install dashscope
+
+官方把 Paraformer 标为较早一代模型；如果以后能把录音传到 OSS 拿公网 URL，可换 qwen3-asr-flash-filetrans（≤12 小时，四川话在列）。
 """
 import os
 import pathlib
@@ -23,11 +26,11 @@ from http import HTTPStatus
 
 import audio_tools
 
-ENDPOINTS = {
-    # (http, websocket)。新域名是 https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1，旧域名仍可用，这里用旧域名省得填 WorkspaceId
+# 地域代码。不填 workspace_id 时北京/新加坡用旧域名（官方文档确认仍可用）；美国地域只有业务空间专属域名，必须填 workspace_id
+REGIONS = {"beijing": "cn-beijing", "singapore": "ap-southeast-1", "us": "us-east-1"}
+LEGACY = {
     "beijing":   ("https://dashscope.aliyuncs.com/api/v1",      "wss://dashscope.aliyuncs.com/api-ws/v1/inference"),
     "singapore": ("https://dashscope-intl.aliyuncs.com/api/v1", "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"),
-    "us":        ("https://dashscope-us.aliyuncs.com/api/v1",   "wss://dashscope-us.aliyuncs.com/api-ws/v1/inference"),
 }
 
 
@@ -38,18 +41,24 @@ def _setup(cfg):
         raise RuntimeError("dashscope.api_key 没填（config.json → dashscope.api_key）")
     dashscope.api_key = key
     region = (cfg.get("region") or "beijing").lower()
-    if region not in ENDPOINTS:
-        raise RuntimeError(f"dashscope.region 只能是 {list(ENDPOINTS)}，现在是 {region!r}")
-    http_url, ws_url = ENDPOINTS[region]
-    dashscope.base_http_api_url = http_url
-    dashscope.base_websocket_api_url = ws_url
+    if region not in REGIONS:
+        raise RuntimeError(f"dashscope.region 只能是 {list(REGIONS)}，现在是 {region!r}")
+    ws = (cfg.get("workspace_id") or "").strip()
+    if ws:
+        host = f"{ws}.{REGIONS[region]}.maas.aliyuncs.com"
+        dashscope.base_http_api_url = f"https://{host}/api/v1"
+        dashscope.base_websocket_api_url = f"wss://{host}/api-ws/v1/inference"
+    elif region in LEGACY:
+        dashscope.base_http_api_url, dashscope.base_websocket_api_url = LEGACY[region]
+    else:
+        raise RuntimeError("美国地域需要在 config.json → dashscope.workspace_id 填业务空间 ID（百炼控制台可查）")
     return dashscope, region
 
 
 def _paraformer_realtime(dashscope, model, wav_path):
     from dashscope.audio.asr import Recognition
     rec = Recognition(model=model, format="wav", sample_rate=16000, language_hints=["zh"], callback=None)
-    result = rec.call(str(wav_path))
+    result = rec.call(str(pathlib.Path(wav_path).resolve()))
     if result.status_code != HTTPStatus.OK:
         raise RuntimeError(f"{model}: {result.status_code} {result.message}")
     sentences = result.get_sentence() or []
