@@ -7,6 +7,22 @@
 目前完成的是 **UI 和手机端的完整流程**（问题 → 录音 → 听一听 → 保存 → 下一个问题 → 回看讲过的故事），
 数据先存在手机浏览器里（IndexedDB）；同步到这台电脑的服务器是下一步。
 
+## 线上地址（GitHub Pages）
+
+- 正式：<https://guiliangz.github.io/grandma-stories/>
+- 演示版（不用麦克风）：<https://guiliangz.github.io/grandma-stories/?demo>
+- 仓库：<https://github.com/GuiliangZ/grandma-stories>
+
+是 HTTPS，所以手机浏览器会正常弹出麦克风权限；把链接发到奶奶微信里点开即可，不需要和电脑在同一个 WiFi。
+
+改完 `web/` 里的文件后，运行一次就会自动更新线上页面（约 1 分钟生效）：
+
+```bash
+./publish.sh
+```
+
+`deploy/` 是推到 GitHub 的那份拷贝，不要直接改它，改 `web/`。
+
 ## 目录
 
 ```
@@ -19,6 +35,7 @@ grandma-stories/
 │   ├── storage.js           # 手机本地存储（IndexedDB）
 │   └── audio/q/*.m4a        # 每个问题的语音（Mac「婷婷」朗读，AAC）
 ├── make_question_audio.py   # 改了 questions.js 后重新生成语音
+├── publish.sh               # 把 web/ 推到 GitHub Pages（deploy/ 是推上去的那份拷贝）
 └── README.md
 ```
 
@@ -34,6 +51,10 @@ python3 -m http.server 8767 --directory grandma-stories/web
 Claude Code 里已经配好了 `.claude/launch.json` 的 `grandma-stories` 预览项。
 
 ## 在奶奶的微信里打开
+
+**推荐**：直接发上面的 GitHub Pages 链接。
+
+**局域网方式（只适合看界面）**：注意 `http://` 的局域网地址不是安全上下文，手机浏览器不会给麦克风权限，录音功能只在 HTTPS 链接或电脑上的 localhost 才能用。
 
 1. 手机和 Mac 连同一个 WiFi，查 Mac 的局域网 IP（系统设置 → WiFi → 详细信息），比如 `192.168.1.10`。
 2. 服务器改成对局域网开放：`python3 -m http.server 8767 --bind 0.0.0.0 --directory grandma-stories/web`
