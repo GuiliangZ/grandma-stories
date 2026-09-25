@@ -1,0 +1,4 @@
+# 服务本身只用 Python 标准库。按选的识别引擎装对应的包：
+dashscope>=1.20        # provider = dashscope（阿里云百炼，支持四川话）
+faster-whisper>=1.0    # provider = whisper（本地离线，只认普通话，四川话不准）
+# provider = baidu 只用标准库，不用装东西

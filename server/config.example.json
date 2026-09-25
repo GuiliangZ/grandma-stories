@@ -1,0 +1,9 @@
+{
+  "port": 8790,
+  "token": "",
+  "stories_dir": "../stories",
+  "provider": "none",
+  "dashscope": { "api_key": "", "model": "paraformer-realtime-v2", "region": "beijing" },
+  "baidu":     { "api_key": "", "secret_key": "", "dev_pid": 1837 },
+  "whisper":   { "model": "small" }
+}

@@ -1,11 +1,12 @@
 # 奶奶的故事
 
 一个在微信里打开的网页，用大字、大按钮引导奶奶讲自己的人生故事：
-先用**语音 + 文字**问她一个问题（比如「您和您的丈夫是怎么认识的？」），
-然后录音、转文字，把录音和文字一起保存下来。
+先用**语音 + 文字**问她一个问题（比如「您和您的丈夫是怎么认识的？」），然后录音，
+录音传回你这台 Mac，用**支持四川话的识别引擎**整理成文字，录音和文字一起存在电脑上。
 
-目前完成的是 **UI 和手机端的完整流程**（问题 → 录音 → 听一听 → 保存 → 下一个问题 → 回看讲过的故事），
-数据先存在手机浏览器里（IndexedDB）；同步到这台电脑的服务器是下一步。
+- 每个按键按下去都有语音反馈（「开始录音了，请讲」「已经保存好了」……）
+- 手机上录的是 16kHz 单声道 WAV，安卓、苹果一样，识别引擎直接能用
+- 手机端先存一份（IndexedDB），传到电脑后再取回整理好的文字
 
 ## 线上地址（GitHub Pages）
 
@@ -13,83 +14,123 @@
 - 演示版（不用麦克风）：<https://guiliangz.github.io/grandma-stories/?demo>
 - 仓库：<https://github.com/GuiliangZ/grandma-stories>
 
-是 HTTPS，所以手机浏览器会正常弹出麦克风权限；把链接发到奶奶微信里点开即可，不需要和电脑在同一个 WiFi。
-
-改完 `web/` 里的文件后，运行一次就会自动更新线上页面（约 1 分钟生效）：
-
-```bash
-./publish.sh
-```
-
-`deploy/` 是推到 GitHub 的那份拷贝，不要直接改它，改 `web/`。
+是 HTTPS，所以手机浏览器会正常弹出麦克风权限（`http://` 的局域网地址拿不到麦克风）。
+奶奶在国内时 github.io 不一定打得开，正式用 Mac 的 Funnel 地址（见下），这里当备份和源码展示。
 
 ## 目录
 
 ```
 grandma-stories/
-├── web/                     # 手机上打开的页面（纯 HTML/CSS/JS，没有任何外部依赖）
+├── web/                     # 手机上打开的页面（纯 HTML/CSS/JS，没有外部依赖）
 │   ├── index.html           # 六个页面：首页 / 问题 / 录音中 / 录好了 / 保存好了 / 讲过的故事(列表+详情)
-│   ├── style.css            # 大字、大按钮、暖色，锁定浅色模式
-│   ├── app.js               # 流程逻辑、录音、实时转文字、读问题、保存/上传接口
-│   ├── questions.js         # 问题库（想加问题改这里）
+│   ├── config.js            # 称呼、电脑服务器地址等设置 ←改这里
+│   ├── questions.js         # 问题库 ←想加问题改这里
+│   ├── ui-phrases.js        # 每个按键的语音反馈文案 ←改这里
+│   ├── app.js               # 流程逻辑、上传、取回文字
+│   ├── speaker.js           # 语音播报（按键反馈 + 读问题）
+│   ├── recorder.js          # Web Audio 录音，边录边降到 16kHz，输出 WAV
 │   ├── storage.js           # 手机本地存储（IndexedDB）
-│   └── audio/q/*.m4a        # 每个问题的语音（Mac「婷婷」朗读，AAC）
-├── make_question_audio.py   # 改了 questions.js 后重新生成语音
-├── publish.sh               # 把 web/ 推到 GitHub Pages（deploy/ 是推上去的那份拷贝）
+│   └── audio/q/, audio/ui/  # 问题语音、按键语音（Mac「婷婷」朗读，AAC）
+├── server/                  # 电脑端：接收录音 + 四川话转文字（只用 Python 标准库）
+│   ├── server.py            # HTTP 服务：POST /api/stories，GET /api/stories/<id>
+│   ├── run.sh               # 一键启动：服务 + Tailscale Funnel，打印给奶奶的固定 HTTPS 地址
+│   ├── install-service.sh   # 装成开机自启的常驻服务
+│   ├── config.example.json  # 抄一份成 config.json，填识别引擎和密钥（config.json 不会被发布）
+│   ├── transcribe.py        # 按 provider 分发
+│   ├── providers/           # dashscope_asr / baidu_asr / whisper_local
+│   └── audio_tools.py       # 转 16k wav、按静音切段
+├── stories/                 # 收到的录音和文字（不发布）
+│   └── 2026-09-25_1330_meet-husband/  audio.wav  meta.json  transcript.txt
+├── make_question_audio.py   # 改了 questions.js / ui-phrases.js 后重新生成语音
+├── publish.sh               # 把 web/ + server/ 推到 GitHub Pages（deploy/ 是推上去的那份拷贝）
 └── README.md
 ```
+
+## 它是怎么听懂四川话的
+
+```
+奶奶的手机（微信里的网页）                      你的 Mac
+ 按「开始讲」→ 录 16kHz WAV ──HTTPS 隧道──→ server.py 存到 stories/
+ 保存后每 5 秒问一次「整理好了吗」 ←────────  识别引擎（四川话模型）写回 transcript.txt
+ 取回文字，显示在「讲过的故事」里
+```
+
+手机浏览器自带的实时识别只认普通话，屏幕上会标注「初步识别，四川话可能不准」；
+**最终文字以电脑用方言引擎整理的为准**，整理好后会自动替换。
+
+## 电脑端：怎么跑起来
+
+奶奶在国内，github.io 时常打不开，所以**正式使用时页面和上传都走 Mac 上的服务**，
+用 Tailscale Funnel 给这台 Mac 一个固定的 HTTPS 公网地址（免费、不用买域名）。
+
+1. **装 Tailscale 并登录**（只做一次，要输 Mac 密码）
+   ```bash
+   brew install --cask tailscale-app
+   ```
+   然后打开 Tailscale.app 登录。
+2. **配置识别引擎**
+   ```bash
+   cd server && cp config.example.json config.json
+   ```
+   打开 `config.json`：`provider` 选下面表里的一个，填对应的密钥；`token` 填一串随便的字母数字（防止别人往你电脑传东西）。
+   按选的引擎装包：`pip install dashscope`（百度不用装）。
+3. **启动**
+   ```bash
+   ./server/run.sh
+   ```
+   第一次会提示在 Tailscale 后台启用 HTTPS 证书和 Funnel（输出里有链接），启用后再跑一次，就会打印：
+   ```
+   ✓ 奶奶用这个地址：https://你的电脑名.你的tailnet.ts.net/
+   ```
+   **把这个地址发到奶奶的微信**，点开就能用。地址固定不变，电脑重启也一样。
+4. **想让它开机自动跑**（可选）
+   ```bash
+   ./server/install-service.sh
+   ```
+   装成 LaunchAgent，崩了自动拉起；Funnel 的转发规则 run.sh 开过一次后会一直保留。
+
+电脑要开着、别合盖（系统设置 → 电池 → 关掉「合盖睡眠」，或接电源时不睡眠）。
+
+## 识别引擎对比（四川话）
+
+| provider | 四川话 | 长录音 | 需要什么 | 说明 |
+|---|---|---|---|---|
+| `dashscope` | ✅ 官方列出 | ✅ 流式，无时长限制 | 阿里云百炼 API Key（`DASHSCOPE_API_KEY`） | 默认模型 `paraformer-realtime-v2`，支持四川话等十几种方言；也可换 `qwen3-asr-flash`（单次 ≤3 分钟，会自动切段）。推荐。 |
+| `baidu` | ✅ `dev_pid=1837` | 每次 ≤60 秒，程序自动按静音切段 | 百度智能云 API Key + Secret Key | 短语音识别标准版，四川话专用模型。 |
+| `whisper` | ❌ 只认普通话 | ✅ | `pip install faster-whisper`，离线 | 没网时兜底，四川话会错很多。 |
+| `none` | – | – | – | 只存录音不转文字（默认）。 |
+
+密钥怎么拿、参数细节见 `server/providers/` 里每个文件开头的注释。
+
+## 改问题、改称呼、改按键语音
+
+- 问题：编辑 `web/questions.js`（保持 JSON 格式）
+- 按键语音：编辑 `web/ui-phrases.js`
+- 改完运行 `python3 make_question_audio.py` 重新生成语音（只重做改过的）
+- 称呼（默认「奶奶」）、服务器地址：`web/config.js`
 
 ## 本地预览
 
 ```bash
-python3 -m http.server 8767 --directory grandma-stories/web
+python3 server/server.py          # http://localhost:8790/?demo  （server.py 顺便托管 web/）
 ```
 
-浏览器打开 <http://localhost:8767/?demo>。`?demo` 是演示模式：不用麦克风，模拟录音和转文字，方便在电脑上看界面。
-去掉 `?demo` 就是真实模式（会请求麦克风权限）。
+`?demo` 是演示模式：不用麦克风，模拟录音和转文字。加 `&server=http://localhost:8790` 可以连本机服务试上传。
+Claude Code 里有 `grandma-stories`（静态页 8767）和 `grandma-server`（8790）两个预览项。
 
-Claude Code 里已经配好了 `.claude/launch.json` 的 `grandma-stories` 预览项。
+## 发布到线上
 
-## 在奶奶的微信里打开
+改完 `web/` 或 `server/` 后：
 
-**推荐**：直接发上面的 GitHub Pages 链接。
+```bash
+./publish.sh
+```
 
-**局域网方式（只适合看界面）**：注意 `http://` 的局域网地址不是安全上下文，手机浏览器不会给麦克风权限，录音功能只在 HTTPS 链接或电脑上的 localhost 才能用。
-
-1. 手机和 Mac 连同一个 WiFi，查 Mac 的局域网 IP（系统设置 → WiFi → 详细信息），比如 `192.168.1.10`。
-2. 服务器改成对局域网开放：`python3 -m http.server 8767 --bind 0.0.0.0 --directory grandma-stories/web`
-3. 把 `http://192.168.1.10:8767/` 发到奶奶的微信里（或者做成二维码），点开就是这个页面。
-   微信对 http 链接可能弹「非官方网页」提示，点「继续访问」即可；也可以「在浏览器打开」。
-4. 建议把链接「收藏」或置顶到聊天，奶奶下次直接点。
-
-## 改问题、改称呼
-
-- 问题：编辑 `web/questions.js`（保持 JSON 格式），然后 `python3 grandma-stories/make_question_audio.py` 重新生成语音。
-- 称呼（默认「奶奶」）、以后的服务器地址：在 `web/app.js` 顶部的 `CONFIG` 里。
-
-## 手机上怎么工作的
-
-| 功能 | 现在的做法 | 备注 |
-|---|---|---|
-| 读问题 | 优先播放 `audio/q/<id>.m4a`，播不了就用手机自带朗读 | 预生成的语音在微信里最可靠 |
-| 录音 | `MediaRecorder`（iOS 出 m4a，安卓出 webm） | 见下面「已知风险」 |
-| 实时转文字 | 手机支持 `SpeechRecognition` 就实时显示；不支持就先存录音，等电脑转 | 微信内置浏览器基本不支持实时识别，所以电脑端转写是主路径 |
-| 保存 | 录音 + 文字 + 问题 + 时间存进手机 IndexedDB；`CONFIG.serverUrl` 有值时同时 POST 到电脑 | 上传格式见下 |
-
-上传接口（前端已经写好，等服务器实现）：`POST {serverUrl}/api/stories`，multipart 表单，
-`meta` 字段是 JSON（id / questionId / question / stage / text / createdAt / duration / mimeType / filename），
-`audio` 字段是录音文件。
-
-## 下一步（还没做）
-
-1. **电脑端服务器**（`server.py`）：接收上面的 POST，把文件存到 `stories/2026-09-25_meet-husband.m4a` + 同名 `.json`/`.txt`。
-2. **电脑端转文字**：服务器收到录音后用本地 whisper（推荐 `faster-whisper`，中文效果好、离线）转写，回写 `.txt`，页面下次打开时拉取更新。
-3. **同步**：页面启动时把手机里没上传成功的故事补传。
-4. 可选：把所有故事导出成一本带音频的 HTML / PDF「回忆录」。
+会同步到 `deploy/` 并推到 GitHub，约 1 分钟生效。`deploy/` 不要直接改。`server/config.json` 和 `stories/` 不会被推上去。
 
 ## 已知风险
 
-- **微信 iOS 内置浏览器的录音**：苹果手机上的微信对网页麦克风（`getUserMedia`）支持不稳定，安卓微信一般没问题。
-  如果奶奶用 iPhone 且微信里录不了，备选方案：让她用 Safari 打开同一个链接（可以「添加到主屏幕」当 App 用），
-  或者把这套 UI 移植成真正的微信小程序（小程序的录音 API 很稳，但需要注册 AppID 和开发者工具）。
-- 微信的「字体大小」设置会放大网页，代码里已经调用 `setFontSizeCallback` 锁定，避免排版错乱。
+- **微信 iOS 内置浏览器的录音**：苹果手机上的微信对网页麦克风支持不稳定，安卓微信一般没问题。
+  如果奶奶用 iPhone 且微信里录不了，让她用 Safari 打开同一个链接（可「添加到主屏幕」当 App 用）。
+- Tailscale Funnel 从国内访问要经 Tailscale 的中转节点（香港/东京等），速度没实测；如果奶奶那边打不开，备选是 Cloudflare 隧道或国内云主机中转。
+- 手机上的「初步文字」是普通话引擎，四川话不准，仅作即时反馈；以电脑整理的为准。

@@ -60,6 +60,8 @@ body {
 .title { font-size: 36px; font-weight: 800; margin: 0; }
 .muted { color: var(--muted); font-weight: 500; font-size: 26px; }
 .meta { color: var(--muted); font-size: 22px; margin: 0; }
+.status { color: var(--blue); font-size: 22px; margin: 0; min-height: 0; }
+.status:empty { display: none; }
 
 .question { font-size: 38px; font-weight: 700; line-height: 1.45; margin: 12px 0; }
 .question.small { font-size: 28px; font-weight: 600; margin: 0; }

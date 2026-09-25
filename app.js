@@ -1,24 +1,36 @@
 (() => {
   'use strict';
 
-  // ====== 可以改的设置 ======
-  const CONFIG = {
-    name: '奶奶',                 // 称呼
-    serverUrl: '',                // 以后填电脑上服务器的地址，如 'http://192.168.1.10:8000'；留空就只存在手机里
-    questionAudioDir: 'audio/q/', // 提前在电脑上生成的问题语音（make_question_audio.py）
-  };
-  // 网址后面加 ?demo 进入演示模式：不用麦克风，模拟录音和转文字，方便在电脑上看界面
-  const DEMO = new URLSearchParams(location.search).has('demo');
+  // ====== 设置在 config.js 里改，不要改这里 ======
+  const CONFIG = Object.assign({
+    name: '奶奶', serverUrl: '', serverToken: '',
+    questionAudioDir: 'audio/q/', uiAudioDir: 'audio/ui/', liveCaptions: true,
+  }, window.APP_CONFIG || {});
+  const params = new URLSearchParams(location.search);
+  const DEMO = params.has('demo');          // ?demo 演示模式：不用麦克风
+  try {                                     // ?server=https://...&token=... 一次性设置电脑服务器，手机会记住
+    if (params.has('server')) {
+      localStorage.setItem('serverUrl', params.get('server').trim());
+      localStorage.setItem('serverToken', (params.get('token') || '').trim());
+    }
+    CONFIG.serverUrl = localStorage.getItem('serverUrl') || CONFIG.serverUrl;
+    CONFIG.serverToken = localStorage.getItem('serverToken') || CONFIG.serverToken;
+  } catch (_) {}
+  // 页面如果就是电脑上的 server.py 托管的（比如 Tailscale Funnel 地址），接口就在同一个地址下
+  if (!CONFIG.serverUrl && !/github\.io$/.test(location.hostname) && /^https?:$/.test(location.protocol)) {
+    CONFIG.serverUrl = location.origin;
+  }
+  const serverBase = () => CONFIG.serverUrl.replace(/\/$/, '');
+  const authHeaders = () => (CONFIG.serverToken ? { 'X-Token': CONFIG.serverToken } : {});
 
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
-  const promptAudio = $('#prompt-audio');
   const playbackAudio = $('#playback-audio');
+  Speaker.configure({ uiDir: CONFIG.uiAudioDir, questionDir: CONFIG.questionAudioDir, phrases: window.UI_PHRASES || {} });
 
   const state = {
-    stories: [], current: null,
-    recorder: null, stream: null, chunks: [], blob: null,
-    seconds: 0, timer: null, recording: false,
+    stories: [], current: null, detailId: null,
+    blob: null, seconds: 0, timer: null, recording: false, paused: false,
     recognition: null, transcript: '', sessionFinal: '', interim: '',
     wakeLock: null, demoTimer: null, playUrl: null,
   };
@@ -28,15 +40,17 @@
     $$('.screen').forEach((s) => s.classList.toggle('active', s.id === 'screen-' + name));
     window.scrollTo(0, 0);
   }
-  function ask(title, text, okLabel, cancelLabel) {
+  function ask(title, text, okLabel, cancelLabel, sayOk, sayCancel) {
     return new Promise((resolve) => {
       $('#modal-title').textContent = title;
       $('#modal-text').textContent = text;
       const ok = $('#modal-ok');
       const cancel = $('#modal-cancel');
       ok.textContent = okLabel || '知道了';
+      ok.dataset.say = sayOk || 'ok';
       cancel.hidden = !cancelLabel;
       cancel.textContent = cancelLabel || '';
+      cancel.dataset.say = sayCancel || 'ok';
       ok.onclick = () => { $('#modal').hidden = true; resolve(true); };
       cancel.onclick = () => { $('#modal').hidden = true; resolve(false); };
       $('#modal').hidden = false;
@@ -53,34 +67,17 @@
     const d = new Date(ts);
     return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
   };
-  const extOf = (mime) => (/mp4|aac|m4a/.test(mime) ? 'm4a' : /ogg/.test(mime) ? 'ogg' : /wav/.test(mime) ? 'wav' : 'webm');
 
-  // ====== 把问题读出来：优先放电脑生成的语音，没有就用手机自带的朗读 ======
-  let voices = [];
-  function loadVoices() { if ('speechSynthesis' in window) voices = speechSynthesis.getVoices(); }
-  loadVoices();
-  if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = loadVoices;
-
-  function speakTTS(text) {
-    if (!('speechSynthesis' in window)) return;
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'zh-CN';
-    u.rate = 0.8;
-    const v = voices.find((x) => /zh[-_]CN/i.test(x.lang)) || voices.find((x) => /^zh/i.test(x.lang));
-    if (v) u.voice = v;
-    speechSynthesis.speak(u);
-  }
-  function stopSpeaking() {
-    promptAudio.pause();
-    if ('speechSynthesis' in window) speechSynthesis.cancel();
-  }
-  function speakQuestion(q) {
-    stopSpeaking();
-    promptAudio.src = CONFIG.questionAudioDir + q.id + '.m4a';
-    const p = promptAudio.play();
-    if (p && p.catch) p.catch(() => speakTTS(q.text));
-  }
+  // ====== 每个按键的语音反馈：带 data-say 的按钮，点下去先读一句 ======
+  let audioUnlocked = false;
+  document.addEventListener('click', (e) => {
+    if (!audioUnlocked) {            // 第一次点按顺便"解锁"回放用的 audio（iPhone 要求在点按里播过一次）
+      audioUnlocked = true;
+      try { playbackAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; const p = playbackAudio.play(); if (p && p.catch) p.catch(() => {}); } catch (_) {}
+    }
+    const b = e.target.closest('[data-say]');
+    if (b && !b.disabled) Speaker.say(b.dataset.say);
+  }, true);
 
   // ====== 选问题：先问没讲过的，都讲过了就从头再来 ======
   function nextQuestion(after) {
@@ -99,15 +96,10 @@
     $('#q-text').textContent = q.text;
     $('#q-answered').hidden = !state.stories.some((s) => s.questionId === q.id);
     show('question');
-    speakQuestion(q);
+    Speaker.question(q);            // 排在按键反馈后面读
   }
 
   // ====== 录音 ======
-  function pickMime() {
-    if (!window.MediaRecorder) return '';
-    return ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus']
-      .find((m) => MediaRecorder.isTypeSupported(m)) || '';
-  }
   function renderTimer() { $('#rec-timer').textContent = fmtTime(state.seconds); }
   function renderTranscript(el, text, placeholder) {
     const t = (text || '').trim();
@@ -123,73 +115,72 @@
   }
 
   async function startRecording() {
-    stopSpeaking();
     const q = state.current;
     const recBtn = $('#btn-record');
-    state.chunks = []; state.blob = null;
-    state.transcript = ''; state.sessionFinal = ''; state.interim = '';
+    const feedback = Speaker.last;                 // 「开始录音了，请讲」正在播
+    state.blob = null; state.transcript = ''; state.sessionFinal = ''; state.interim = '';
 
     if (!DEMO) {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+      if (!WavRecorder.supported()) {
+        Speaker.say('mic_error');
         showMessage('这个手机暂时不能录音', '请让家人帮忙看看，换个方式打开');
         return;
       }
+      WavRecorder.ensureContext();                 // 必须在点按里同步创建（iPhone 要求）
       recBtn.disabled = true;
       recBtn.textContent = '正在打开麦克风…';
       try {
-        state.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        await WavRecorder.open();
       } catch (e) {
+        Speaker.say('mic_error');
         showMessage('没有听到声音', '请允许使用麦克风，然后再按一次「开始讲」');
         return;
       } finally {
         recBtn.disabled = false;
         recBtn.textContent = '🎙️ 按这里，开始讲';
       }
-      const mime = pickMime();
-      state.recorder = new MediaRecorder(state.stream, mime ? { mimeType: mime } : undefined);
-      state.recorder.ondataavailable = (e) => { if (e.data && e.data.size) state.chunks.push(e.data); };
-      state.recorder.onstop = () => {
-        state.blob = new Blob(state.chunks, { type: state.recorder.mimeType || mime || 'audio/webm' });
-        if (state.stream) { state.stream.getTracks().forEach((t) => t.stop()); state.stream = null; }
-        openReview();
-      };
-      state.recorder.start(1000);
     }
+    const ok = await Speaker.wait(feedback, 4000); // 等提示音放完再开始录，免得把提示音录进去
+    if (ok === false) { if (!DEMO) WavRecorder.cancel(); return; }
+    Speaker.stop();
+    if (!DEMO) WavRecorder.start();
 
-    state.recording = true;
+    state.recording = true; state.paused = false;
     $('#rec-question').textContent = q.text;
     renderTranscript($('#rec-transcript'), '', '（您说的话会一句一句显示在这里）');
     state.seconds = 0;
     renderTimer();
-    state.timer = setInterval(() => { state.seconds++; renderTimer(); }, 1000);
+    state.timer = setInterval(() => { if (!state.paused) { state.seconds++; renderTimer(); } }, 1000);
     startRecognition();
     keepScreenOn();
     show('recording');
   }
 
+  function finishCapture() {
+    state.recording = false; state.paused = false;
+    clearInterval(state.timer);
+    stopRecognition();
+    releaseScreen();
+  }
   function stopRecording() {
     if (!state.recording) return;
-    state.recording = false;
-    clearInterval(state.timer);
-    stopRecognition();
-    releaseScreen();
-    if (DEMO) { state.blob = silentWav(Math.max(1, state.seconds)); openReview(); return; }
-    if (state.recorder && state.recorder.state !== 'inactive') state.recorder.stop();
+    finishCapture();
+    state.blob = DEMO ? silentWav(Math.max(1, state.seconds)) : WavRecorder.stop();   // 先停录，再说话
+    Speaker.say('stop');
+    openReview();
   }
-
   async function cancelRecording() {
-    const yes = await ask('这段不要了？', '不保存，回到问题重新来', '不要了', '继续讲');
-    if (!yes) return;
-    state.recording = false;
-    clearInterval(state.timer);
-    stopRecognition();
-    releaseScreen();
-    if (state.recorder && state.recorder.state !== 'inactive') { state.recorder.onstop = null; state.recorder.stop(); }
-    if (state.stream) { state.stream.getTracks().forEach((t) => t.stop()); state.stream = null; }
+    if (!state.recording) return;
+    state.paused = true;                           // 弹窗期间先暂停，别把提示音录进去
+    if (!DEMO) WavRecorder.pause();
+    const yes = await ask('这段不要了？', '不保存，回到问题重新来', '不要了', '继续讲', 'discard', 'continue');
+    if (!yes) { state.paused = false; if (!DEMO) WavRecorder.resume(); return; }
+    finishCapture();
+    if (!DEMO) WavRecorder.cancel();
     openQuestion(state.current);
   }
 
-  // ====== 实时转文字（手机支持就显示；不支持就等电脑整理） ======
+  // ====== 手机上的初步转文字（普通话引擎，四川话不准；只是给个即时反馈，最终以电脑整理的为准） ======
   const DEMO_LINES = [
     '那时候我才十八岁，在镇上的纺织厂上班。',
     '他是隔壁村的，每个星期骑自行车来厂里送货。',
@@ -199,13 +190,14 @@
   function startDemoTranscript() {
     let i = 0;
     state.demoTimer = setInterval(() => {
-      if (i >= DEMO_LINES.length) return;
+      if (i >= DEMO_LINES.length || state.paused) return;
       state.transcript += DEMO_LINES[i++];
       renderTranscript($('#rec-transcript'), state.transcript, '');
     }, 2500);
   }
   function startRecognition() {
     if (DEMO) { startDemoTranscript(); return; }
+    if (!CONFIG.liveCaptions) return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
     const r = new SR();
@@ -241,7 +233,7 @@
     if (r) { try { r.stop(); } catch (_) {} }
   }
 
-  // ====== 回放 / 保存 ======
+  // ====== 回放 ======
   function stopPlayback() {
     playbackAudio.pause();
     try { playbackAudio.currentTime = 0; } catch (_) {}
@@ -254,23 +246,30 @@
     state.playUrl = URL.createObjectURL(blob);
     playbackAudio.src = state.playUrl;
     btn.textContent = '▶️ 听一听';
-    btn.onclick = () => {
+    btn.onclick = async () => {
       if (playbackAudio.paused) {
+        const ok = await Speaker.wait(Speaker.say('play'), 3000);   // 先说「放给您听」
+        if (ok === false) return;
         playbackAudio.play().then(() => { btn.textContent = '⏸️ 暂停'; })
           .catch(() => showMessage('放不出来', '这个手机放不了这段录音'));
       } else {
         playbackAudio.pause();
         btn.textContent = '▶️ 继续听';
+        Speaker.say('pause');
       }
     };
     playbackAudio.onended = () => { btn.textContent = '▶️ 再听一遍'; };
   }
+
+  // ====== 录好了 / 保存 ======
   function openReview() {
     const q = state.current;
     $('#rv-stage').textContent = '关于' + q.stage;
     $('#rv-question').textContent = q.text;
     $('#rv-duration').textContent = '（' + fmtDuration(state.seconds) + '）';
-    renderTranscript($('#rv-transcript'), state.transcript, '文字还在整理中，保存以后电脑会自动整理好。');
+    const has = !!state.transcript.trim();
+    renderTranscript($('#rv-transcript'), state.transcript, '保存以后，电脑会把这段话整理成文字。');
+    $('#rv-status').textContent = has ? '这是手机的初步识别，四川话可能不准；保存后电脑会重新整理。' : '';
     setupPlayer($('#btn-play'), state.blob);
     show('review');
   }
@@ -281,12 +280,12 @@
     const story = {
       id: String(Date.now()),
       questionId: q.id, question: q.text, stage: q.stage,
-      text: state.transcript.trim(),
+      text: state.transcript.trim(), liveText: state.transcript.trim(), serverText: '',
+      serverStatus: 'none', uploaded: false,
       createdAt: Date.now(), duration: state.seconds,
-      mimeType: state.blob ? state.blob.type : '',
-      audio: state.blob,
+      mimeType: state.blob ? state.blob.type : '', audio: state.blob,
     };
-    story.filename = `${fmtFileDate(story.createdAt)}_${q.id}.${extOf(story.mimeType)}`;
+    story.filename = `${fmtFileDate(story.createdAt)}_${q.id}.wav`;
     try {
       await StoryStore.save(story);
       state.stories = await StoryStore.all();
@@ -296,18 +295,72 @@
       return;
     }
     btn.disabled = false;
-    uploadStory(story);
     stopPlayback();
     show('saved');
+    syncSoon(300);
   }
-  // 以后接电脑上的服务器：POST 一个 multipart 表单，meta 是 JSON，audio 是录音文件
-  function uploadStory(story) {
-    if (!CONFIG.serverUrl) return;
-    const fd = new FormData();
-    const { audio, ...meta } = story;
-    fd.append('meta', JSON.stringify(meta));
-    if (audio) fd.append('audio', audio, story.filename);
-    fetch(CONFIG.serverUrl.replace(/\/$/, '') + '/api/stories', { method: 'POST', body: fd }).catch(() => {});
+
+  // ====== 和电脑同步：上传录音，取回电脑整理好的文字 ======
+  let syncTimer = null, syncing = false;
+  function syncSoon(delay) { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, delay || 0); }
+  async function uploadStory(s) {
+    try {
+      const fd = new FormData();
+      const { audio, ...meta } = s;
+      fd.append('meta', JSON.stringify(meta));
+      if (audio) fd.append('audio', audio, s.filename);
+      const r = await fetch(serverBase() + '/api/stories', { method: 'POST', body: fd, headers: authHeaders() });
+      return r.ok;
+    } catch (_) { return false; }
+  }
+  async function fetchStatus(id) {
+    try {
+      const r = await fetch(serverBase() + '/api/stories/' + encodeURIComponent(id), { headers: authHeaders() });
+      return r.ok ? await r.json() : null;
+    } catch (_) { return null; }
+  }
+  async function syncNow() {
+    if (syncing || !CONFIG.serverUrl) return;
+    syncing = true;
+    let again = 0;
+    try {
+      for (const s of state.stories) {
+        if (Date.now() - s.createdAt > 30 * 24 * 3600 * 1000) continue;
+        if (!s.uploaded) {
+          if (await uploadStory(s)) { s.uploaded = true; s.serverStatus = 'pending'; await StoryStore.save(s); refreshStoryViews(s); }
+          else { again = Math.max(again, 30000); continue; }
+        }
+        if (s.serverStatus === 'pending') {
+          const r = await fetchStatus(s.id);
+          if (r && r.status === 'done') {
+            s.serverStatus = 'done'; s.serverText = r.text || '';
+            if (s.serverText) s.text = s.serverText;
+            await StoryStore.save(s); refreshStoryViews(s);
+          } else if (r && r.status === 'failed') {
+            s.serverStatus = 'failed'; s.serverError = r.error || '';
+            await StoryStore.save(s); refreshStoryViews(s);
+          } else if (r && r.status === 'missing') {
+            s.uploaded = false; await StoryStore.save(s); again = Math.max(again, 5000);
+          } else {
+            again = Math.max(again, 5000);
+          }
+        }
+      }
+    } catch (_) {} finally { syncing = false; }
+    if (again) syncSoon(again);
+  }
+  function refreshStoryViews(s) {
+    const active = document.querySelector('.screen.active');
+    if (!active) return;
+    if (active.id === 'screen-detail' && state.detailId === s.id) openDetail(s, true);
+    if (active.id === 'screen-list') renderList();
+  }
+  function statusLine(s) {
+    if (s.serverStatus === 'done') return '';
+    if (s.serverStatus === 'pending') return '电脑正在整理文字（四川话识别）…';
+    if (s.serverStatus === 'failed') return '文字整理没成功，请让家人看看电脑上的记录。';
+    if (!CONFIG.serverUrl) return '';
+    return '还没传到电脑，连上网以后会自动上传。';
   }
 
   // ====== 讲过的故事 ======
@@ -324,25 +377,29 @@
       const b = document.createElement('button');
       b.className = 'card';
       b.type = 'button';
+      b.dataset.say = 'open';
       b.innerHTML = '<span class="card-arrow">›</span><div class="card-q"></div><div class="card-meta"></div>';
       b.querySelector('.card-q').textContent = s.question;
-      b.querySelector('.card-meta').textContent = `${fmtDate(s.createdAt)} · ${fmtDuration(s.duration)}`;
+      const st = s.serverStatus === 'pending' ? ' · 文字整理中' : (s.text ? '' : ' · 还没有文字');
+      b.querySelector('.card-meta').textContent = `${fmtDate(s.createdAt)} · ${fmtDuration(s.duration)}${st}`;
       b.onclick = () => openDetail(s);
       box.appendChild(b);
     });
   }
-  function openDetail(s) {
+  function openDetail(s, silent) {
+    state.detailId = s.id;
     $('#dt-stage').textContent = '关于' + s.stage;
     $('#dt-question').textContent = s.question;
     $('#dt-meta').textContent = `${fmtDate(s.createdAt)} · ${fmtDuration(s.duration)}`;
+    $('#dt-status').textContent = statusLine(s);
     renderTranscript($('#dt-transcript'), s.text, '这段还没有整理成文字。');
-    setupPlayer($('#btn-detail-play'), s.audio);
+    if (!silent) setupPlayer($('#btn-detail-play'), s.audio);
     show('detail');
   }
 
   // 演示模式用的一段静音 wav，让「听一听」按钮也能试
   function silentWav(seconds) {
-    const rate = 8000, n = rate * seconds;
+    const rate = 16000, n = rate * seconds;
     const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
     const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
     str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
@@ -368,8 +425,8 @@
   function bind() {
     $('#btn-start').onclick = () => openQuestion(nextQuestion(null));
     $('#btn-list').onclick = () => { renderList(); show('list'); };
-    $('#btn-q-home').onclick = () => { stopSpeaking(); renderHome(); show('home'); };
-    $('#btn-replay').onclick = () => speakQuestion(state.current);
+    $('#btn-q-home').onclick = () => { renderHome(); show('home'); };
+    $('#btn-replay').onclick = () => Speaker.question(state.current);
     $('#btn-record').onclick = startRecording;
     $('#btn-skip').onclick = () => openQuestion(nextQuestion(state.current));
     $('#btn-stop').onclick = stopRecording;
@@ -380,6 +437,7 @@
     $('#btn-home-2').onclick = () => { renderHome(); show('home'); };
     $('#btn-list-back').onclick = () => { stopPlayback(); renderHome(); show('home'); };
     $('#btn-detail-back').onclick = () => { stopPlayback(); renderList(); show('list'); };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) syncSoon(500); });
   }
 
   async function init() {
@@ -394,6 +452,7 @@
     try { state.stories = await StoryStore.all(); } catch (_) { state.stories = []; }
     renderHome();
     show('home');
+    syncSoon(1500);
   }
   init();
 })();

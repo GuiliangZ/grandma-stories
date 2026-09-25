@@ -19,15 +19,15 @@
       <p class="count" id="home-count">还没有开始讲，今天就开始吧</p>
     </div>
     <div class="stack">
-      <button class="btn primary" id="btn-start" type="button">🎙️ 开始讲故事</button>
-      <button class="btn secondary" id="btn-list" type="button">📖 听听讲过的故事</button>
+      <button class="btn primary" id="btn-start" data-say="start" type="button">🎙️ 开始讲故事</button>
+      <button class="btn secondary" id="btn-list" data-say="list" type="button">📖 听听讲过的故事</button>
     </div>
   </section>
 
   <!-- 问题 -->
   <section class="screen" id="screen-question">
     <div class="topbar">
-      <button class="back" id="btn-q-home" type="button">‹ 首页</button>
+      <button class="back" id="btn-q-home" data-say="home" type="button">‹ 首页</button>
       <span class="tag" id="q-stage"></span>
     </div>
     <div class="grow center">
@@ -36,9 +36,9 @@
       <p class="answered-note" id="q-answered" hidden>✔ 这个问题讲过了，可以再讲一次</p>
     </div>
     <div class="stack">
-      <button class="btn secondary" id="btn-replay" type="button">🔊 再听一遍问题</button>
-      <button class="btn primary" id="btn-record" type="button">🎙️ 按这里，开始讲</button>
-      <button class="btn text" id="btn-skip" type="button">换一个问题 ›</button>
+      <button class="btn secondary" id="btn-replay" data-say="replay" type="button">🔊 再听一遍问题</button>
+      <button class="btn primary" id="btn-record" data-say="record" type="button">🎙️ 按这里，开始讲</button>
+      <button class="btn text" id="btn-skip" data-say="skip" type="button">换一个问题 ›</button>
     </div>
   </section>
 
@@ -51,7 +51,7 @@
     <div class="transcript empty" id="rec-transcript">（您说的话会一句一句显示在这里）</div>
     <div class="stack">
       <button class="btn green" id="btn-stop" type="button">✅ 讲完了</button>
-      <button class="btn text" id="btn-cancel-rec" type="button">这段不要了</button>
+      <button class="btn text" id="btn-cancel-rec" data-say="cancel" type="button">这段不要了</button>
     </div>
   </section>
 
@@ -62,9 +62,10 @@
     <p class="question small" id="rv-question"></p>
     <button class="btn secondary" id="btn-play" type="button">▶️ 听一听</button>
     <div class="transcript" id="rv-transcript"></div>
+    <p class="status" id="rv-status"></p>
     <div class="stack">
-      <button class="btn green" id="btn-save" type="button">💾 保存这段故事</button>
-      <button class="btn text" id="btn-redo" type="button">重新讲一遍</button>
+      <button class="btn green" id="btn-save" data-say="save" type="button">💾 保存这段故事</button>
+      <button class="btn text" id="btn-redo" data-say="redo" type="button">重新讲一遍</button>
     </div>
   </section>
 
@@ -76,14 +77,14 @@
       <p class="sub">谢谢您，<span class="name">奶奶</span> ❤️</p>
     </div>
     <div class="stack">
-      <button class="btn primary" id="btn-next" type="button">➡️ 下一个问题</button>
-      <button class="btn secondary" id="btn-home-2" type="button">🏠 今天先到这里</button>
+      <button class="btn primary" id="btn-next" data-say="next" type="button">➡️ 下一个问题</button>
+      <button class="btn secondary" id="btn-home-2" data-say="bye" type="button">🏠 今天先到这里</button>
     </div>
   </section>
 
   <!-- 讲过的故事 -->
   <section class="screen" id="screen-list">
-    <div class="topbar"><button class="back" id="btn-list-back" type="button">‹ 首页</button></div>
+    <div class="topbar"><button class="back" id="btn-list-back" data-say="home" type="button">‹ 首页</button></div>
     <h2 class="title">讲过的故事</h2>
     <div class="stack" id="story-list"></div>
     <p class="empty-note" id="list-empty" hidden>还没有讲过故事，回到首页开始吧</p>
@@ -92,11 +93,12 @@
   <!-- 一个故事 -->
   <section class="screen" id="screen-detail">
     <div class="topbar">
-      <button class="back" id="btn-detail-back" type="button">‹ 返回</button>
+      <button class="back" id="btn-detail-back" data-say="back" type="button">‹ 返回</button>
       <span class="tag" id="dt-stage"></span>
     </div>
     <p class="question small" id="dt-question"></p>
     <p class="meta" id="dt-meta"></p>
+    <p class="status" id="dt-status"></p>
     <button class="btn secondary" id="btn-detail-play" type="button">▶️ 听一听</button>
     <div class="transcript" id="dt-transcript"></div>
   </section>
@@ -114,8 +116,12 @@
   <audio id="prompt-audio" preload="auto"></audio>
   <audio id="playback-audio"></audio>
 
+  <script src="config.js"></script>
   <script src="questions.js"></script>
+  <script src="ui-phrases.js"></script>
   <script src="storage.js"></script>
+  <script src="speaker.js"></script>
+  <script src="recorder.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
