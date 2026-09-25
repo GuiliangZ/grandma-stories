@@ -510,7 +510,21 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) syncSoon(500); });
   }
 
+  // 网址后面加 ?reset：清空这部手机上存的故事（电脑上的不受影响），口令保留
+  async function resetLocal() {
+    try { await new Promise((r) => { const q = indexedDB.deleteDatabase('grandma-stories'); q.onsuccess = q.onerror = q.onblocked = () => r(); }); } catch (_) {}
+    try {
+      const keep = { serverUrl: localStorage.getItem('serverUrl'), serverToken: localStorage.getItem('serverToken') };
+      localStorage.clear();
+      Object.entries(keep).forEach(([k, v]) => { if (v) localStorage.setItem(k, v); });
+    } catch (_) {}
+    const clean = new URL(location.href);
+    clean.searchParams.delete('reset'); clean.searchParams.delete('token');
+    location.replace(clean.toString());
+  }
+
   async function init() {
+    if (params.has('reset')) { await resetLocal(); return; }
     $$('.name').forEach((el) => { el.textContent = CONFIG.name; });
     if (DEMO) {
       const b = document.createElement('div');
