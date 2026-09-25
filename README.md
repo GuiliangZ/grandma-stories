@@ -149,7 +149,7 @@ python3 server/manage.py index              # 重建 总览.md 和各用户的 �
 ## 通知与备份
 
 - 转写完成后 5 分钟内的故事合并成一条，推到你的微信（OpenClaw，带 m4a 录音），推不了就走 Server酱，再不行 iMessage（`server/config.json` 的 `notify`）。
-- `server/install-service.sh` 装了两个常驻任务：服务本身（崩了自动拉起、防休眠）和每天 03:00 的备份（`server/backup.sh`，只增不删地同步到 iCloud Drive 的 `grandma-stories/`）。日志在 `server/logs/`。
+- `server/install-service.sh` 把服务装成常驻任务（崩了自动拉起、防休眠）。服务自己每天 03:00 备份到 `~/grandma-stories-backup/`（只增不删）。想同步到 iCloud Drive，在终端跑 `python3 server/manage.py backup`（常驻服务里访问 iCloud Drive 会被 macOS 权限卡住）。日志在 `server/logs/`。
 - 电源：建议 系统设置 → 电池 → 关掉「合盖睡眠」或接电源时「防止自动进入睡眠」，并关掉自动安装 macOS 更新。
 
 ## 语音

@@ -14,8 +14,7 @@ done
 if [ "$1" = "uninstall" ]; then
   launchctl unload "$PLIST" 2>/dev/null || true
   rm -f "$PLIST"; echo "已卸载 $LABEL"
-  launchctl unload "$HOME/Library/LaunchAgents/com.grandma-stories.backup.plist" 2>/dev/null || true
-  rm -f "$HOME/Library/LaunchAgents/com.grandma-stories.backup.plist"; echo "已卸载每日备份"; exit
+  exit
 fi
 mkdir -p "$HOME/Library/LaunchAgents" logs
 cat > "$PLIST" <<PL
@@ -36,21 +35,5 @@ launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST"
 echo "已安装并启动 $LABEL（日志：$(pwd)/logs/server.log）"
 
-# 每天 03:00 备份到 iCloud Drive（只增不删）
-BPLIST=$HOME/Library/LaunchAgents/com.grandma-stories.backup.plist
-cat > "$BPLIST" <<PL
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>com.grandma-stories.backup</string>
-  <key>ProgramArguments</key><array><string>/bin/bash</string><string>$(pwd)/backup.sh</string></array>
-  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
-  <key>RunAtLoad</key><true/>
-  <key>StandardOutPath</key><string>$(pwd)/logs/backup.log</string>
-  <key>StandardErrorPath</key><string>$(pwd)/logs/backup.log</string>
-</dict></plist>
-PL
-launchctl unload "$BPLIST" 2>/dev/null || true
-launchctl load "$BPLIST"
-echo "已安装每日备份 com.grandma-stories.backup（日志：$(pwd)/logs/backup.log）"
+echo "备份由服务自己每天 03:00 做（server.py 里的 backup_loop），不需要单独的任务"
 echo "记得开一次 Funnel（只需一次）：tailscale funnel --bg $(python3 -c "import json;print(json.load(open('config.json')).get('port',8790))")"

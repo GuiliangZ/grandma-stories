@@ -214,6 +214,53 @@ def save_story(meta: dict, filename: str, data: bytes) -> pathlib.Path:
     return d
 
 
+# 常驻服务（launchd）里访问 iCloud Drive 会被 macOS 权限卡住，所以服务自己备份到家目录；
+# 想同步到 iCloud Drive 用终端跑 `python3 server/manage.py backup`（终端有权限），或在系统设置里给 python 完全磁盘访问权限。
+BACKUP_DST = pathlib.Path(CONFIG.get("backup_dir") or (pathlib.Path.home() / "grandma-stories-backup")).expanduser()
+ICLOUD_DST = pathlib.Path.home() / "Library" / "Mobile Documents" / "com~apple~CloudDocs" / "grandma-stories"
+
+
+def backup_now(dst=None):
+    """把 stories/ 里没备份过的文件复制过去（只增不删：这边删了那边还在）。"""
+    import shutil
+    BACKUP = pathlib.Path(dst) if dst else BACKUP_DST
+    copied = 0
+    try:
+        BACKUP.mkdir(parents=True, exist_ok=True)
+        BACKUP_DST_USED = BACKUP
+        (BACKUP / "README.txt").write_text(
+            "奶奶的故事 · 备份说明\n每个用户一个文件夹，里面每条录音一个文件夹：日期_问题/\n"
+            "  audio.wav 录音（16kHz WAV）  transcript.txt 识别文字  meta.json 详细信息\n"
+            "目录.md 是每个用户的清单，总览.md 是汇总。这个备份只增不删。\n", encoding="utf-8")
+        for src in STORIES.rglob("*"):
+            if src.is_dir() or src.name == ".DS_Store":
+                continue
+            rel = src.relative_to(STORIES)
+            dst = BACKUP / rel
+            if dst.exists() and dst.stat().st_size == src.stat().st_size and not src.name.endswith((".md", ".json")):
+                continue
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            copied += 1
+        LOGS.mkdir(exist_ok=True)
+        (LOGS / "last-backup").write_text(time.strftime("%Y-%m-%d %H:%M:%S") + f" copied={copied}\n", encoding="utf-8")
+        log(f"备份完成 → {BACKUP}（新增/更新 {copied} 个文件）")
+        return copied
+    except Exception as e:
+        log("备份失败", repr(e)[:160])
+        return -1
+
+
+def backup_loop():
+    time.sleep(30)
+    backup_now()
+    while True:
+        now = time.localtime()
+        secs = ((3 - now.tm_hour) % 24) * 3600 - now.tm_min * 60 - now.tm_sec   # 到下一个 03:00
+        time.sleep(secs if secs > 60 else 24 * 3600)
+        backup_now()
+
+
 def worker():
     while True:
         d = JOBS.get()
@@ -285,7 +332,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/api/health":
-            return self._json(200, {"ok": True, "provider": CONFIG.get("provider"), "stories": len(INDEX), "queue": JOBS.qsize()})
+            lb = ""
+            try: lb = (LOGS / "last-backup").read_text(encoding="utf-8").strip()
+            except Exception: pass
+            return self._json(200, {"ok": True, "provider": CONFIG.get("provider"), "stories": len(INDEX), "queue": JOBS.qsize(), "lastBackup": lb})
         if path.startswith("/api/"):
             if not self._authed("family"):
                 return self._json(401, {"error": "bad token"})
@@ -398,6 +448,11 @@ class Handler(BaseHTTPRequestHandler):
             meta = read_meta(d); meta["status"] = "pending"; meta["error"] = ""; write_meta(d, meta)
             JOBS.put(d)
             return self._json(200, {"ok": True, "status": "pending"})
+        if path == "/api/backup":                      # 手动触发备份（家人页/管理用）
+            if not self._authed():
+                return self._json(401, {"error": "bad token"})
+            n = backup_now()
+            return self._json(200, {"ok": n >= 0, "copied": n, "dest": str(BACKUP_DST)})
         if path == "/api/users":                       # 新建用户（同名就返回已有的）
             if not self._authed():
                 return self._json(401, {"error": "bad token"})
@@ -514,6 +569,7 @@ def main():
     load_index()
     write_indexes()
     threading.Thread(target=worker, daemon=True).start()
+    threading.Thread(target=backup_loop, daemon=True).start()
     port = int(CONFIG.get("port") or 8790)
     httpd = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     log(f"服务已启动：http://localhost:{port}/  故事存在 {STORIES}  识别引擎 = {CONFIG.get('provider')}  排队 {JOBS.qsize()}")

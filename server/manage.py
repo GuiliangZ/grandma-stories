@@ -5,6 +5,7 @@
     python3 server/manage.py delete-user 名字           删除用户（它的录音移到 stories/_deleted/）
     python3 server/manage.py migrate                   把早期结构（用户ID文件夹、英文问题名）改成 用户名/日期_问题
     python3 server/manage.py index                     重建每个用户的 目录.md 和 总览.md
+    python3 server/manage.py backup                    立刻备份一次到 iCloud Drive
 改完请重启服务（服务启动时会重新扫描）。"""
 import json
 import pathlib
@@ -104,7 +105,7 @@ def cmd_index():
 
 if __name__ == "__main__":
     a = sys.argv[1:]
-    if not a or a[0] not in ("users", "rename-user", "delete-user", "migrate", "index"):
+    if not a or a[0] not in ("users", "rename-user", "delete-user", "migrate", "index", "backup"):
         print(__doc__); sys.exit(1)
     {"users": lambda: cmd_users(), "rename-user": lambda: cmd_rename(a[1], a[2]), "delete-user": lambda: cmd_delete(a[1]),
-     "migrate": cmd_migrate, "index": cmd_index}[a[0]]()
+     "migrate": cmd_migrate, "index": cmd_index, "backup": lambda: (S.backup_now(S.ICLOUD_DST if S.ICLOUD_DST.parent.exists() else None), print("备份到", S.ICLOUD_DST if S.ICLOUD_DST.parent.exists() else S.BACKUP_DST))}[a[0]]()
