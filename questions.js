@@ -2,9 +2,9 @@
 // id 只用英文和横线（会当文件名用）；stage 是阶段标签；text 是读给奶奶听、显示给奶奶看的问题。
 window.QUESTIONS = [
   {"id": "childhood-home",    "stage": "童年",      "text": "您小时候住在哪里？家里是什么样子的？"},
-  {"id": "childhood-home",    "stage": "童年",      "text": "您小时候家里有几口人？大院子里是怎么个情况？"},
+  {"id": "childhood-home-2",    "stage": "童年",      "text": "您小时候家里有几口人？大院子里是怎么个情况？"},
   {"id": "parents",           "stage": "童年",      "text": "您的爸爸妈妈是什么样的人？您对您的爸爸妈妈还有什么样的映像？"},
-  {"id": "parents",           "stage": "童年",      "text": "您的爸爸妈妈是怎么去世的？"},
+  {"id": "parents-2",           "stage": "童年",      "text": "您的爸爸妈妈是怎么去世的？"},
   {"id": "childhood-happy",   "stage": "童年",      "text": "您小时候最满意最开心的一件事是什么？"},
   {"id": "childhood-food",    "stage": "童年",      "text": "小时候家里都吃些什么？您最爱吃什么？"},
   {"id": "school",            "stage": "童年",      "text": "您上过学吗？还记得学校里的事情吗？"},
