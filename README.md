@@ -35,12 +35,18 @@ grandma-stories/
 │   ├── server.py            # HTTP 服务：POST /api/stories，GET /api/stories/<id>
 │   ├── run.sh               # 一键启动：服务 + Tailscale Funnel，打印给奶奶的固定 HTTPS 地址
 │   ├── install-service.sh   # 装成开机自启的常驻服务
+│   ├── manage.py            # 后台用户管理：users / rename-user / delete-user / index
 │   ├── config.example.json  # 抄一份成 config.json，填识别引擎和密钥（config.json 不会被发布）
 │   ├── transcribe.py        # 按 provider 分发
 │   ├── providers/           # dashscope_asr / baidu_asr / whisper_local
 │   └── audio_tools.py       # 转 16k wav、按静音切段
-├── stories/                 # 收到的录音和文字（不发布）
-│   └── 2026-09-25_1330_meet-husband/  audio.wav  meta.json  transcript.txt
+├── stories/                 # 收到的录音和文字（不发布），按用户分文件夹
+│   ├── 总览.md              # 每个用户几条、最近一次
+│   ├── users.json           # 用户名单（手机上「选人/新建名字」维护）
+│   ├── 奶奶/
+│   │   ├── 目录.md          # 这个人的每一条：时间、问题、时长、文字开头、文件夹
+│   │   └── 2026-09-25_1541_您小时候住在哪里？家里是什么样子的？/  audio.wav  meta.json  transcript.txt
+│   └── _deleted/            # 手机上删掉的录音移到这里，可找回
 ├── make_question_audio.py   # 改了 questions.js / ui-phrases.js 后重新生成语音
 ├── publish.sh               # 把 web/ + server/ 推到 GitHub Pages（deploy/ 是推上去的那份拷贝）
 └── README.md
@@ -108,6 +114,20 @@ grandma-stories/
 - **腾讯云 录音文件识别** 引擎 `16k_zh_en_2.0`（大模型 2.0，31 种方言含四川；base64 上传单段 ≤5MB，要切成 ≤2 分钟；无免费额度，0.8 元/小时）。文档 <https://cloud.tencent.com/document/product/1093/37823>
 
 密钥怎么拿、参数细节见 `server/providers/` 里每个文件开头的注释。**准确率没有实测过**：填上密钥后录一段真实的四川话试一下，不满意就换一家。
+
+## 用户与后台管理
+
+手机上第一次打开会先「选人 / 新建名字」，之后所有录音归到这个人名下，首页右上角「换人」可切换。
+Mac 上：
+
+```bash
+python3 server/manage.py users              # 列出用户和录音数
+python3 server/manage.py rename-user 奶奶 外婆
+python3 server/manage.py delete-user 爷爷    # 录音移到 stories/_deleted/
+python3 server/manage.py index              # 重建 总览.md 和各用户的 目录.md
+```
+
+改完用户请重启服务。手机上删掉的录音在 `stories/_deleted/`；在手机网址后加 `?reset` 可清空那部手机上的本地记录。
 
 ## 改问题、改称呼、改按键语音
 

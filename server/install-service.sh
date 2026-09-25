@@ -6,7 +6,11 @@ set -e
 cd "$(dirname "$0")"
 LABEL=com.grandma-stories.server
 PLIST=$HOME/Library/LaunchAgents/$LABEL.plist
-PY=$(command -v python3)
+PY=""
+for c in "$(command -v python3)" "$HOME/miniconda3/envs/fuck-env/bin/python3" /opt/homebrew/bin/python3 /usr/bin/python3; do
+  [ -n "$c" ] && [ -x "$c" ] && "$c" -c 'import dashscope' 2>/dev/null && { PY="$c"; break; }
+done
+[ -n "$PY" ] || { echo "没找到装了 dashscope 的 python3，先 pip install dashscope"; exit 1; }
 if [ "$1" = "uninstall" ]; then
   launchctl unload "$PLIST" 2>/dev/null || true
   rm -f "$PLIST"; echo "已卸载 $LABEL"; exit
@@ -17,10 +21,11 @@ cat > "$PLIST" <<PL
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>$LABEL</string>
-  <key>ProgramArguments</key><array><string>$PY</string><string>$(pwd)/server.py</string></array>
+  <key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-i</string><string>$PY</string><string>$(pwd)/server.py</string></array>
   <key>WorkingDirectory</key><string>$(pwd)</string>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
   <key>StandardOutPath</key><string>$(pwd)/logs/server.log</string>
   <key>StandardErrorPath</key><string>$(pwd)/logs/server.log</string>
 </dict></plist>
