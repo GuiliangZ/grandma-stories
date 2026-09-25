@@ -91,6 +91,65 @@ def safe(s, n=64):
     return re.sub(r"[^A-Za-z0-9_-]", "", str(s))[:n] or "x"
 
 
+def fs_name(s, n=40):
+    """能当文件夹名的字符串：保留中文，去掉路径和系统不允许的符号。"""
+    s = re.sub(r'[\\/:*?"<>|\r\n\t]', "", str(s or "")).strip().strip(".")
+    return s[:n] or "x"
+
+
+def user_name(uid, fallback=""):
+    if uid in ("", "default", None):
+        return "未分组"
+    for u in load_users():
+        if u["id"] == uid:
+            return u["name"]
+    return fallback or uid
+
+
+def user_dir(uid, fallback_name=""):
+    return STORIES / fs_name(user_name(uid, fallback_name), 20)
+
+
+def story_dirname(meta):
+    ts = time.localtime((meta.get("createdAt") or time.time() * 1000) / 1000)
+    q = meta.get("question") or meta.get("questionId") or "q"
+    return f"{time.strftime('%Y-%m-%d_%H%M', ts)}_{fs_name(q, 24)}"
+
+
+def write_indexes():
+    """每个用户目录下写 目录.md，根目录写 总览.md：一眼看出哪条录音是谁的、哪个问题。"""
+    try:
+        by_user = {}
+        with LOCK:
+            dirs = list(INDEX.values())
+        for d in dirs:
+            try:
+                m = read_meta(d)
+            except Exception:
+                continue
+            by_user.setdefault(d.parent, []).append((m, d))
+        total = []
+        for udir, items in sorted(by_user.items()):
+            items.sort(key=lambda x: x[0].get("createdAt") or 0, reverse=True)
+            lines = [f"# {udir.name} 的故事（{len(items)} 条）", "", "| 时间 | 问题 | 时长 | 状态 | 文字（开头） | 文件夹 |", "|---|---|---|---|---|---|"]
+            for m, d in items:
+                ts = time.strftime("%Y-%m-%d %H:%M", time.localtime((m.get("createdAt") or 0) / 1000))
+                dur = int(m.get("duration") or 0)
+                st = {"done": "已转写", "pending": "排队中", "working": "转写中", "failed": "失败"}.get(m.get("status"), m.get("status"))
+                txt = (m.get("text") or "").replace("|", "｜").replace("\n", " ")[:40]
+                lines.append(f"| {ts} | {m.get('question') or m.get('questionId')} | {dur // 60}分{dur % 60}秒 | {st} | {txt} | `{d.name}/` |")
+            lines += ["", "每个文件夹里：audio.wav（录音）、transcript.txt（转写文字）、meta.json（详细信息）。", ""]
+            (udir / "目录.md").write_text("\n".join(lines), encoding="utf-8")
+            total.append((udir.name, len(items), items[0][0].get("createdAt") or 0))
+        lines = ["# 奶奶的故事 · 总览", "", "按用户分文件夹，每个用户文件夹里有 `目录.md`；每条录音一个文件夹：`日期_问题/`。", "", "| 用户 | 录音数 | 最近一次 |", "|---|---|---|"]
+        for name, n, last in sorted(total, key=lambda x: -x[2]):
+            lines.append(f"| {name} | {n} | {time.strftime('%Y-%m-%d %H:%M', time.localtime(last / 1000)) if last else ''} |")
+        lines += ["", "用户名单：users.json。删掉的录音在 _deleted/ 里，可以找回。", "后台管理：`python3 server/manage.py users | rename-user 旧名 新名 | delete-user 名字 | index`", ""]
+        (STORIES / "总览.md").write_text("\n".join(lines), encoding="utf-8")
+    except Exception as e:
+        log("写目录失败", repr(e)[:120])
+
+
 def parse_multipart(ctype: str, body: bytes):
     m = re.search(r'boundary="?([^";]+)"?', ctype)
     if not m:
@@ -124,8 +183,8 @@ def parse_multipart(ctype: str, body: bytes):
 def save_story(meta: dict, filename: str, data: bytes) -> pathlib.Path:
     sid = safe(meta.get("id") or int(time.time() * 1000))
     ts = time.localtime((meta.get("createdAt") or time.time() * 1000) / 1000)
-    base = f"{time.strftime('%Y-%m-%d_%H%M', ts)}_{safe(meta.get('questionId') or 'q', 40)}"
-    udir = STORIES / safe(meta.get("user") or "default")
+    base = story_dirname(meta)
+    udir = user_dir(safe(meta.get("user") or "default"), str(meta.get("userName") or ""))
     udir.mkdir(parents=True, exist_ok=True)
     d = udir / base
     i = 2
@@ -172,6 +231,7 @@ def worker():
             write_meta(d, meta)
             (d / "transcript.txt").write_text(text + "\n", encoding="utf-8")
             log("转写完成", d.name, f"{len(text)} 字")
+            write_indexes()
         except Exception as e:
             log("转写失败", d.name, repr(e)); traceback.print_exc()
             try:
@@ -365,6 +425,7 @@ class Handler(BaseHTTPRequestHandler):
         log("收到录音", d.name, f"{len(data) // 1024} KB", (meta.get("question") or "")[:20])
         self._json(201, {"id": sid, "status": "pending"})
         JOBS.put(d)                                    # 先答复手机，再排队转写
+        write_indexes()
 
     def do_DELETE(self):
         path = urlparse(self.path).path
@@ -383,6 +444,7 @@ class Handler(BaseHTTPRequestHandler):
                 target = trash / f"{d.name}_{i}"; i += 1
             d.rename(target)
             log("已删除（移到 _deleted，可找回）", d.name)
+            write_indexes()
         return self._json(200, {"ok": True})
 
     def log_message(self, fmt, *args):
@@ -399,6 +461,7 @@ def main():
     except Exception as e:
         log("生成 bundle.js 失败（继续用现有的）", repr(e)[:120])
     load_index()
+    write_indexes()
     threading.Thread(target=worker, daemon=True).start()
     port = int(CONFIG.get("port") or 8790)
     httpd = ThreadingHTTPServer(("0.0.0.0", port), Handler)
