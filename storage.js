@@ -3,7 +3,8 @@
 window.StoryStore = (() => {
   const DB_NAME = 'grandma-stories';
   const STORE = 'stories';
-  const VERSION = 1;
+  const VERSION = 2;
+  const DRAFTS = 'drafts';
 
   function open() {
     return new Promise((resolve, reject) => {
@@ -12,6 +13,7 @@ window.StoryStore = (() => {
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(DRAFTS)) db.createObjectStore(DRAFTS, { keyPath: 'id' });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error || new Error('indexedDB open failed'));
@@ -19,12 +21,12 @@ window.StoryStore = (() => {
     });
   }
 
-  async function run(mode, fn) {
+  async function run(mode, fn, store = STORE) {
     const db = await open();
     return new Promise((resolve, reject) => {
       let tx;
-      try { tx = db.transaction(STORE, mode); } catch (e) { db.close(); return reject(e); }
-      const req = fn(tx.objectStore(STORE));
+      try { tx = db.transaction(store, mode); } catch (e) { db.close(); return reject(e); }
+      const req = fn(tx.objectStore(store));
       tx.oncomplete = () => { db.close(); resolve(req ? req.result : undefined); };
       tx.onerror = () => { db.close(); reject(tx.error || new Error('indexedDB tx failed')); };
       tx.onabort = () => { db.close(); reject(tx.error || new Error('indexedDB tx aborted')); };
@@ -60,5 +62,13 @@ window.StoryStore = (() => {
       return list.map(hydrate).filter((r) => !userId || r.user === userId).sort((a, b) => b.createdAt - a.createdAt);
     },
     remove: (id) => run('readwrite', (s) => s.delete(id)),
+    // 录音草稿：录到一半页面被杀也能找回。chunks 是 Int16Array 数组，追加保存
+    async appendDraft(info, chunks) {
+      const cur = (await run('readonly', (s) => s.get('current'), DRAFTS)) || { id: 'current', parts: [] };
+      const rec = { ...cur, ...info, id: 'current', parts: cur.parts.concat(chunks.map((c) => c.buffer.slice(c.byteOffset, c.byteOffset + c.byteLength))), updatedAt: Date.now() };
+      return run('readwrite', (s) => s.put(rec), DRAFTS);
+    },
+    loadDraft: () => run('readonly', (s) => s.get('current'), DRAFTS),
+    clearDraft: () => run('readwrite', (s) => s.delete('current'), DRAFTS),
   };
 })();

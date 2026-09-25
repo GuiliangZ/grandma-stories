@@ -6,13 +6,13 @@ window.UI_PHRASES = {
   "replay":    "再听一遍",
   "record":    "开始录音了，请讲",
   "skip":      "换一个问题",
-  "stop":      "好，录好了",
+  "stop":      "要得，存好了",
   "cancel":    "这段不要了吗",
   "discard":   "好，这段不要了",
   "continue":  "好，继续讲",
   "play":      "放给您听",
   "pause":     "暂停了",
-  "save":      "已经保存好了",
+  "save":      "已经存好了",
   "redo":      "好，重新讲一遍",
   "next":      "下一个问题",
   "bye":       "好，今天先到这里，谢谢您",
@@ -27,5 +27,11 @@ window.UI_PHRASES = {
   "pick_user":    "请问您是哪一位",
   "new_user":     "请输入您的名字",
   "switch_user":  "换一个人",
-  "hello":        "您好，我们开始吧"
+  "hello":        "您好，我们开始吧",
+  "well_done":    "讲得真好",
+  "continue_story": "好，接着讲",
+  "enough":       "今天讲得够多了，歇一歇吧",
+  "draft_found":  "上次讲到一半的故事还在，要存下来吗",
+  "interrupted":  "刚才被打断了，讲到的已经存好了",
+  "listen_again": "再听一遍"
 };

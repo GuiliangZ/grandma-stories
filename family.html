@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>家人页 · 奶奶的故事</title>
+<style>
+  :root { --bg:#FFF7EE; --card:#fff; --text:#2E221A; --muted:#7A6A5C; --line:#E8DCCB; --blue:#3A6EA5; --green:#2E8B57; --red:#D9483B; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; font-size:17px; line-height:1.6; }
+  header { position:sticky; top:0; background:var(--bg); padding:14px 16px; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:20px; margin:0; flex:1; }
+  input[type=search] { font:inherit; padding:8px 12px; border:2px solid var(--line); border-radius:12px; min-width:200px; }
+  select { font:inherit; padding:8px; border:2px solid var(--line); border-radius:12px; }
+  main { max-width:900px; margin:0 auto; padding:16px; }
+  h2 { font-size:18px; margin:24px 0 8px; color:var(--muted); }
+  .story { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px 16px; margin:10px 0; }
+  .q { font-weight:700; font-size:18px; }
+  .meta { color:var(--muted); font-size:14px; margin:4px 0 8px; }
+  .meta .bad { color:var(--red); }
+  audio { width:100%; margin:6px 0; }
+  textarea { width:100%; font:inherit; font-size:16px; min-height:90px; padding:10px; border:2px solid var(--line); border-radius:12px; resize:vertical; }
+  .row { display:flex; gap:10px; margin-top:8px; flex-wrap:wrap; align-items:center; }
+  button { font:inherit; padding:8px 14px; border:none; border-radius:12px; background:var(--blue); color:#fff; cursor:pointer; }
+  button.secondary { background:#fff; color:var(--text); border:2px solid var(--line); }
+  button:disabled { opacity:.5; }
+  .ok { color:var(--green); font-size:14px; }
+  .empty { color:var(--muted); text-align:center; padding:40px 0; }
+  mark { background:#ffe58a; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📖 奶奶的故事 · 家人页</h1>
+  <select id="user"><option value="">所有人</option></select>
+  <input id="search" type="search" placeholder="搜文字或问题…">
+  <span id="count" class="meta"></span>
+</header>
+<main id="main"><p class="empty">正在加载…</p></main>
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  try { if (params.has('token')) localStorage.setItem('familyToken', params.get('token')); } catch (_) {}
+  const token = (() => { try { return localStorage.getItem('familyToken') || ''; } catch (_) { return ''; } })();
+  const headers = token ? { 'X-Token': token } : {};
+  const $ = (s) => document.querySelector(s);
+  let stories = [], users = [];
+  const fmtDate = (ts) => new Date(ts || 0).toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const fmtDur = (s) => (s >= 60 ? `${Math.floor(s / 60)}分${s % 60}秒` : `${s}秒`);
+  const esc = (s) => String(s || '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+  async function load() {
+    const [r1, r2] = await Promise.all([fetch('/api/stories', { headers }), fetch('/api/users', { headers })]);
+    if (r1.status === 401) { $('#main').innerHTML = '<p class="empty">口令不对。请用带 ?token= 的家人链接打开。</p>'; return; }
+    stories = await r1.json(); users = await r2.json();
+    const sel = $('#user');
+    users.forEach((u) => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.name; sel.appendChild(o); });
+    render();
+  }
+  function render() {
+    const q = $('#search').value.trim();
+    const uid = $('#user').value;
+    const list = stories.filter((s) => (!uid || s.user === uid) && (!q || (s.text || '').includes(q) || (s.question || '').includes(q)));
+    $('#count').textContent = `${list.length} 条`;
+    const main = $('#main'); main.innerHTML = '';
+    if (!list.length) { main.innerHTML = '<p class="empty">没有故事</p>'; return; }
+    const groups = new Map();
+    list.forEach((s) => { const k = (s.userName || s.user || '未分组') + ' · ' + (s.stage || '其他'); (groups.get(k) || groups.set(k, []).get(k)).push(s); });
+    for (const [k, items] of groups) {
+      const h = document.createElement('h2'); h.textContent = k; main.appendChild(h);
+      items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).forEach((s) => main.appendChild(card(s, q)));
+    }
+  }
+  function hl(text, q) { const e = esc(text); return q ? e.split(esc(q)).join('<mark>' + esc(q) + '</mark>') : e; }
+  function card(s, q) {
+    const div = document.createElement('div'); div.className = 'story';
+    const st = { done: '已转写', pending: '排队中', working: '转写中', failed: '<span class="bad">转写失败：' + esc(s.error) + '</span>' }[s.status] || esc(s.status);
+    div.innerHTML = `
+      <div class="q">${hl(s.question, q)}${s.followup ? ' <span class="meta">— 追问：' + esc(s.followup) + '</span>' : ''}</div>
+      <div class="meta">${fmtDate(s.createdAt)} · ${fmtDur(Number(s.duration) || 0)} · ${st}${s.interrupted ? ' · 被打断过' : ''}${s.editedAt ? ' · 家人改过' : ''}</div>
+      <audio controls preload="none" src="/api/stories/${encodeURIComponent(s.id)}/audio${token ? '?token=' + encodeURIComponent(token) : ''}"></audio>
+      <textarea>${esc(s.text || '')}</textarea>
+      <div class="row">
+        <button class="save">保存文字</button>
+        <button class="secondary retry">重新转写</button>
+        <span class="ok"></span>
+      </div>`;
+    const ta = div.querySelector('textarea'), ok = div.querySelector('.ok');
+    div.querySelector('.save').onclick = async (e) => {
+      e.target.disabled = true;
+      const r = await fetch('/api/stories/' + encodeURIComponent(s.id), { method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, headers), body: JSON.stringify({ text: ta.value }) });
+      e.target.disabled = false; ok.textContent = r.ok ? '已保存 ✓' : '保存失败 ' + r.status;
+      if (r.ok) { s.text = ta.value; s.editedAt = 'now'; }
+    };
+    div.querySelector('.retry').onclick = async (e) => {
+      e.target.disabled = true;
+      const r = await fetch('/api/stories/' + encodeURIComponent(s.id) + '/retranscribe', { method: 'POST', headers });
+      ok.textContent = r.ok ? '已排队重新转写，稍后刷新' : '失败 ' + r.status; e.target.disabled = false;
+    };
+    return div;
+  }
+  $('#search').addEventListener('input', render);
+  $('#user').addEventListener('change', render);
+  load().catch((e) => { $('#main').innerHTML = '<p class="empty">加载失败：' + esc(e.message) + '</p>'; });
+})();
+</script>
+</body>
+</html>

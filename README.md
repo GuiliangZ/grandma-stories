@@ -118,6 +118,9 @@ grandma-stories/
 ## 用户与后台管理
 
 手机上第一次打开会先「选人 / 新建名字」，之后所有录音归到这个人名下，首页右上角「换人」可切换。
+**任何手机**打开同一个链接，选同一个名字，都能看到这个人之前的录音和文字（都从 Mac 取）。
+给奶奶的链接可以直接指定她，跳过选人：`https://…ts.net/?token=口令&user=用户ID&name=奶奶`（用户 ID 在 stories/users.json）。
+
 Mac 上：
 
 ```bash
@@ -127,7 +130,32 @@ python3 server/manage.py delete-user 爷爷    # 录音移到 stories/_deleted/
 python3 server/manage.py index              # 重建 总览.md 和各用户的 目录.md
 ```
 
-改完用户请重启服务。手机上删掉的录音在 `stories/_deleted/`；在手机网址后加 `?reset` 可清空那部手机上的本地记录。
+改完用户请重启服务（`launchctl kickstart -k gui/$(id -u)/com.grandma-stories.server`）。
+手机上删掉的录音在 `stories/_deleted/`；在手机网址后加 `?reset` 可清空那部手机上的本地记录。
+
+## 家人页：听、搜、改错字、重新转写
+
+`https://…ts.net/family.html?token=家人口令`（`server/config.json` 里的 `family_token`，只能读和改文字，不能删、不能上传）。
+按人和阶段分组，能搜文字，每条可以播放、修改识别错的字（原识别结果保留在 meta.json 的 asrText 里）、重新转写。
+奶奶手机上会自动拿到改过的文字。
+
+## 讲故事的流程（为了不丢故事）
+
+- 按「讲完了」立刻存进手机并进入「存好了」页，上传在后台进行，不用等。
+- 录音时每 10 秒存一份草稿；来电话、锁屏、切到别的 App、被抢走麦克风，都会自动把讲到的存下来；页面被杀，下次打开会问「上次讲到一半的故事还在，要存下来吗」。
+- 存好后接着问一句追问（每个问题有 2 条，在 questions.js 的 `followups`），「接着讲」继续同一个问题；一次打开讲满 3 段会提示「今天讲得够多了，歇一歇」。
+- 「换一个问题」跳过的问题会排到最后，不会每次一打开就先弹它。
+
+## 通知与备份
+
+- 转写完成后 5 分钟内的故事合并成一条，推到你的微信（OpenClaw，带 m4a 录音），推不了就走 Server酱，再不行 iMessage（`server/config.json` 的 `notify`）。
+- `server/install-service.sh` 装了两个常驻任务：服务本身（崩了自动拉起、防休眠）和每天 03:00 的备份（`server/backup.sh`，只增不删地同步到 iCloud Drive 的 `grandma-stories/`）。日志在 `server/logs/`。
+- 电源：建议 系统设置 → 电池 → 关掉「合盖睡眠」或接电源时「防止自动进入睡眠」，并关掉自动安装 macOS 更新。
+
+## 语音
+
+问题、追问和按键提示现在用阿里云 Qwen-TTS 的四川话女声「Sunny」生成（`python3 make_question_audio.py`，默认 `qwen:Sunny`）。
+想换回普通话：`python3 make_question_audio.py Tingting`。
 
 ## 改问题、改称呼、改按键语音
 

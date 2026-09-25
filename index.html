@@ -49,26 +49,26 @@
       <p class="count" id="home-count">还没有开始讲，今天就开始吧</p>
     </div>
     <div class="stack">
-      <button class="btn primary" id="btn-start" data-say="start" type="button">🎙️ 开始讲故事</button>
-      <button class="btn secondary" id="btn-list" data-say="list" type="button">📖 听听讲过的故事</button>
+      <button class="btn primary" id="btn-start" type="button" data-say="start">🎙️ 开始讲故事</button>
+      <button class="btn secondary" id="btn-list" type="button" data-say="list">📖 听听讲过的故事</button>
     </div>
   </section>
 
   <!-- 问题 -->
   <section class="screen" id="screen-question">
     <div class="topbar">
-      <button class="back" id="btn-q-home" data-say="home" type="button">‹ 首页</button>
+      <button class="back" id="btn-q-home" type="button" data-say="home">‹ 首页</button>
       <span class="tag" id="q-stage"></span>
     </div>
     <div class="grow center">
-      <p class="hint">请听问题：</p>
+      <p class="hint" id="q-progress"></p>
       <p class="question" id="q-text"></p>
       <p class="answered-note" id="q-answered" hidden>✔ 这个问题讲过了，可以再讲一次</p>
     </div>
     <div class="stack">
-      <button class="btn secondary" id="btn-replay" data-say="replay" type="button">🔊 再听一遍问题</button>
-      <button class="btn primary" id="btn-record" data-say="record" type="button">🎙️ 按这里，开始讲</button>
-      <button class="btn text" id="btn-skip" data-say="skip" type="button">换一个问题 ›</button>
+      <button class="btn secondary" id="btn-replay" type="button" data-say="replay">🔊 再听一遍问题</button>
+      <button class="btn primary" id="btn-record" type="button" data-say="record">🎙️ 按这里，开始讲</button>
+      <button class="btn text" id="btn-skip" type="button" data-say="skip">换一个问题 ›</button>
     </div>
   </section>
 
@@ -81,41 +81,29 @@
     <div class="transcript empty" id="rec-transcript">（您说的话会一句一句显示在这里）</div>
     <div class="stack">
       <button class="btn green" id="btn-stop" type="button">✅ 讲完了</button>
-      <button class="btn text" id="btn-cancel-rec" data-say="cancel" type="button">这段不要了</button>
     </div>
   </section>
 
-  <!-- 录完了：听一听、保存 -->
-  <section class="screen" id="screen-review">
-    <div class="topbar"><span class="tag" id="rv-stage"></span></div>
-    <h2 class="title">录好了！<span class="muted" id="rv-duration"></span></h2>
-    <p class="question small" id="rv-question"></p>
-    <button class="btn secondary" id="btn-play" type="button">▶️ 听一听</button>
-    <div class="transcript" id="rv-transcript"></div>
-    <p class="status" id="rv-status"></p>
-    <div class="stack">
-      <button class="btn green" id="btn-save" data-say="save" type="button">💾 保存这段故事</button>
-      <button class="btn text" id="btn-redo" data-say="redo" type="button">重新讲一遍</button>
-    </div>
-  </section>
-
-  <!-- 保存成功 -->
+  <!-- 存好了：可以听、接着讲追问、下一个 -->
   <section class="screen" id="screen-saved">
+    <div class="topbar"><span class="tag" id="sv-stage"></span><button class="back" id="btn-saved-home" type="button" data-say="home">首页 ›</button></div>
+    <h2 class="title">✅ 存好了 <span class="muted" id="sv-duration"></span></h2>
+    <p class="status" id="saved-note"></p>
+    <button class="btn secondary" id="btn-play-saved" type="button">▶️ 听一听</button>
     <div class="grow center">
-      <div class="big-check">✅</div>
-      <h1 class="greeting">保存好了</h1>
-      <p class="sub">谢谢您，<span class="name">奶奶</span> ❤️</p>
-      <p class="status" id="saved-note"></p>
+      <p class="hint" id="sv-followup-label" hidden>接着问：</p>
+      <p class="question" id="sv-followup"></p>
     </div>
     <div class="stack">
-      <button class="btn primary" id="btn-next" data-say="next" type="button">➡️ 下一个问题</button>
-      <button class="btn secondary" id="btn-home-2" data-say="bye" type="button">🏠 今天先到这里</button>
+      <button class="btn primary" id="btn-continue" type="button" data-say="continue_story">🎙️ 接着讲</button>
+      <button class="btn secondary" id="btn-next" type="button" data-say="next">➡️ 下一个问题</button>
+      <button class="btn text" id="btn-home-2" type="button" data-say="bye">🏠 今天先到这里</button>
     </div>
   </section>
 
   <!-- 讲过的故事 -->
   <section class="screen" id="screen-list">
-    <div class="topbar"><button class="back" id="btn-list-back" data-say="home" type="button">‹ 首页</button></div>
+    <div class="topbar"><button class="back" id="btn-list-back" type="button" data-say="home">‹ 首页</button></div>
     <h2 class="title">讲过的故事</h2>
     <div class="stack" id="story-list"></div>
     <p class="empty-note" id="list-empty" hidden>还没有讲过故事，回到首页开始吧</p>
@@ -124,7 +112,7 @@
   <!-- 一个故事 -->
   <section class="screen" id="screen-detail">
     <div class="topbar">
-      <button class="back" id="btn-detail-back" data-say="back" type="button">‹ 返回</button>
+      <button class="back" id="btn-detail-back" type="button" data-say="back">‹ 返回</button>
       <span class="tag" id="dt-stage"></span>
     </div>
     <p class="question small" id="dt-question"></p>
@@ -147,6 +135,21 @@
 
   <audio id="prompt-audio" preload="auto"></audio>
   <audio id="playback-audio"></audio>
-  <script src="bundle.js?v=0033fda325"></script>
+  <script src="bundle.js?v=1de488a2b9"></script>
+  <!-- 保险：脚本没加载好（比如微信缓存了坏文件）时，给个能看懂的提示而不是一个按不动的页面 -->
+  <script>
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      if (window.QUESTIONS && window.Speaker && window.WavRecorder && window.StoryStore) return;
+      var m = document.getElementById('modal'); if (!m) return;
+      document.getElementById('modal-title').textContent = '页面出了点问题';
+      document.getElementById('modal-text').textContent = '请按一下「重新打开」；还不行就让家人看看';
+      document.getElementById('modal-cancel').hidden = true;
+      var ok = document.getElementById('modal-ok'); ok.textContent = '重新打开'; ok.onclick = function () { location.reload(); };
+      m.hidden = false;
+      try { fetch('/api/client-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'bundle-missing', detail: 'Q=' + !!window.QUESTIONS + ' S=' + !!window.Speaker + ' R=' + !!window.WavRecorder + ' D=' + !!window.StoryStore, ua: navigator.userAgent, url: location.href.replace(/token=[^&]+/, 'token=***'), at: new Date().toISOString() }) }); } catch (e) {}
+    }, 2000);
+  });
+  </script>
 </body>
 </html>

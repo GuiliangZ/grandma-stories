@@ -4,6 +4,7 @@ window.WavRecorder = (() => {
   const TARGET = 16000;
   let ctx = null, stream = null, source = null, processor = null, mute = null;
   let chunks = [], leftover = null, capturing = false, inputRate = TARGET, samples = 0;
+  let drained = 0, onInterrupted = null;
 
   function supported() {
     return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (window.AudioContext || window.webkitAudioContext));
@@ -40,6 +41,10 @@ window.WavRecorder = (() => {
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
     inputRate = ctx.sampleRate;
+    // 来电话、被别的 App 抢走麦克风、iPhone 锁屏：轨道会结束或 AudioContext 变成 interrupted，通知上层赶紧把讲到的存下来
+    const track = stream.getAudioTracks()[0];
+    if (track) track.onended = () => { if (capturing && onInterrupted) onInterrupted('track-ended'); };
+    ctx.onstatechange = () => { if (capturing && ctx.state !== 'running' && onInterrupted) onInterrupted('audiocontext-' + ctx.state); };
     source = ctx.createMediaStreamSource(stream);
     processor = ctx.createScriptProcessor(4096, 1, 1);
     mute = ctx.createGain();
@@ -49,7 +54,9 @@ window.WavRecorder = (() => {
     processor.connect(mute);
     mute.connect(ctx.destination);
   }
-  function start() { chunks = []; leftover = null; samples = 0; capturing = true; }
+  function start() { chunks = []; leftover = null; samples = 0; drained = 0; capturing = true; }
+  // 把上次 drain 之后新采到的块交出去（用来每隔几秒存草稿）
+  function drain() { const out = chunks.slice(drained); drained = chunks.length; return out; }
   function pause() { capturing = false; }
   function resume() { capturing = true; }
   function close() {
@@ -77,5 +84,7 @@ window.WavRecorder = (() => {
     for (const p of parts) { out.set(p, off); off += p.length; }
     return new Blob([buf], { type: 'audio/wav' });
   }
-  return { supported, ensureContext, open, start, pause, resume, stop, cancel, seconds: () => samples / TARGET };
+  return { supported, ensureContext, open, start, pause, resume, stop, cancel, drain, encodeWav,
+    seconds: () => samples / TARGET, isCapturing: () => capturing,
+    onInterrupted: (cb) => { onInterrupted = cb; } };
 })();

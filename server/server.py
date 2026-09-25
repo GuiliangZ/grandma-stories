@@ -21,6 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import audio_tools
+import notify
 import transcribe
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -31,6 +32,7 @@ if not CONFIG_PATH.exists():
 CONFIG = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 STORIES = (ROOT / (CONFIG.get("stories_dir") or "../stories")).resolve()
 STORIES.mkdir(parents=True, exist_ok=True)
+notify.configure(CONFIG.get("notify") or {})
 WEB = (ROOT.parent / "web").resolve()
 LOGS = ROOT / "logs"
 JOBS: "queue.Queue[pathlib.Path]" = queue.Queue()
@@ -113,7 +115,8 @@ def user_dir(uid, fallback_name=""):
 def story_dirname(meta):
     ts = time.localtime((meta.get("createdAt") or time.time() * 1000) / 1000)
     q = meta.get("question") or meta.get("questionId") or "q"
-    return f"{time.strftime('%Y-%m-%d_%H%M', ts)}_{fs_name(q, 24)}"
+    tail = "_追问" if meta.get("followup") else ""
+    return f"{time.strftime('%Y-%m-%d_%H%M', ts)}_{fs_name(q, 24)}{tail}"
 
 
 def write_indexes():
@@ -200,6 +203,8 @@ def save_story(meta: dict, filename: str, data: bytes) -> pathlib.Path:
         "questionId": meta.get("questionId"), "question": meta.get("question"), "stage": meta.get("stage"),
         "createdAt": meta.get("createdAt"), "duration": meta.get("duration"),
         "clientText": meta.get("liveText") or meta.get("text") or "",
+        "followup": str(meta.get("followup") or "")[:200], "parentId": str(meta.get("parentId") or "")[:80],
+        "interrupted": bool(meta.get("interrupted")),
         "audio": audio.name, "status": "pending", "text": "", "provider": CONFIG.get("provider"),
         "receivedAt": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
@@ -232,10 +237,13 @@ def worker():
             (d / "transcript.txt").write_text(text + "\n", encoding="utf-8")
             log("转写完成", d.name, f"{len(text)} 字")
             write_indexes()
+            threading.Thread(target=notify.on_story, args=(meta, d), daemon=True).start()
         except Exception as e:
             log("转写失败", d.name, repr(e)); traceback.print_exc()
             try:
                 meta = read_meta(d); meta.update(status="failed", error=f"{type(e).__name__}: {e}"); write_meta(d, meta)
+                write_indexes()
+                threading.Thread(target=notify.on_story, args=(meta, d), daemon=True).start()
             except Exception:
                 pass
         finally:
@@ -257,12 +265,16 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body))); self.end_headers()
         self.wfile.write(body)
 
-    def _authed(self):
+    def _authed(self, level="full"):
         tok = CONFIG.get("token") or ""
+        fam = CONFIG.get("family_token") or ""
         if not tok:
             return True
         q = parse_qs(urlparse(self.path).query)
-        return self.headers.get("X-Token") == tok or q.get("token", [""])[0] == tok
+        given = self.headers.get("X-Token") or q.get("token", [""])[0]
+        if given == tok:
+            return True
+        return level == "family" and bool(fam) and given == fam
 
     def do_OPTIONS(self):
         self.send_response(204); self._cors(); self.end_headers()
@@ -275,7 +287,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/health":
             return self._json(200, {"ok": True, "provider": CONFIG.get("provider"), "stories": len(INDEX), "queue": JOBS.qsize()})
         if path.startswith("/api/"):
-            if not self._authed():
+            if not self._authed("family"):
                 return self._json(401, {"error": "bad token"})
             if path == "/api/users":
                 return self._json(200, load_users())
@@ -376,6 +388,16 @@ class Handler(BaseHTTPRequestHandler):
                     fh.write(line + "\n")
                 log("手机上报", line[:200])
             return self._json(204 if False else 200, {"ok": True})
+        m = re.match(r"^/api/stories/([A-Za-z0-9_-]+)/retranscribe$", path)
+        if m:                                           # 家人页：重新转写这一条
+            if not self._authed("family"):
+                return self._json(401, {"error": "bad token"})
+            d = INDEX.get(m.group(1))
+            if not d:
+                return self._json(404, {"error": "not found"})
+            meta = read_meta(d); meta["status"] = "pending"; meta["error"] = ""; write_meta(d, meta)
+            JOBS.put(d)
+            return self._json(200, {"ok": True, "status": "pending"})
         if path == "/api/users":                       # 新建用户（同名就返回已有的）
             if not self._authed():
                 return self._json(401, {"error": "bad token"})
@@ -403,7 +425,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authed():
             return self._json(401, {"error": "bad token"})
         length = int(self.headers.get("Content-Length") or 0)
-        if length <= 0 or length > 200 * 1024 * 1024:
+        if length <= 0 or length > 30 * 1024 * 1024:            # 10 分钟 WAV 约 19MB
             return self._json(413, {"error": "bad length"})
         body = self.rfile.read(length)
         try:
@@ -426,6 +448,35 @@ class Handler(BaseHTTPRequestHandler):
         self._json(201, {"id": sid, "status": "pending"})
         JOBS.put(d)                                    # 先答复手机，再排队转写
         write_indexes()
+
+    def do_PUT(self):
+        """家人改错字：PUT /api/stories/<id>  {"text": "..."}。第一次改会把识别原文留在 asrText。"""
+        path = urlparse(self.path).path
+        m = re.match(r"^/api/stories/([A-Za-z0-9_-]+)$", path)
+        if not m:
+            return self._json(404, {"error": "not found"})
+        if not self._authed("family"):
+            return self._json(401, {"error": "bad token"})
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            body = json.loads(self.rfile.read(length).decode("utf-8")) if 0 < length <= 200000 else {}
+        except Exception:
+            body = {}
+        d = INDEX.get(m.group(1))
+        if not d:
+            return self._json(404, {"error": "not found"})
+        text = str(body.get("text") or "").strip()
+        with LOCK:
+            meta = read_meta(d)
+            if "asrText" not in meta:
+                meta["asrText"] = meta.get("text", "")
+            meta["text"] = text
+            meta["editedAt"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            write_meta(d, meta)
+            (d / "transcript.txt").write_text(text + "\n", encoding="utf-8")
+        write_indexes()
+        log("文字已修改", d.name, f"{len(text)} 字")
+        return self._json(200, {"ok": True, "id": meta["id"], "text": text})
 
     def do_DELETE(self):
         path = urlparse(self.path).path

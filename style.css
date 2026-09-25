@@ -93,9 +93,6 @@ body {
 
 /* ---------- 录音中：内容压紧一点，保证「讲完了」不用滚动就能看到 ---------- */
 #screen-recording { gap: 12px; }
-#screen-recording .question.small {
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
 #screen-recording .transcript { flex-basis: 100px; min-height: 100px; }
 #screen-recording .btn.text { min-height: 56px; }
 
@@ -166,3 +163,5 @@ body {
 }
 .bigfield:focus { outline: none; border-color: var(--blue); }
 .card.user { font-size: 34px; font-weight: 800; text-align: center; padding: 26px 20px; }
+
+#screen-saved .question { font-size: 34px; margin: 6px 0; }

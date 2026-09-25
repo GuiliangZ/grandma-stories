@@ -1,4 +1,4 @@
-/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=0033fda325 */
+/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=1de488a2b9 */
 /* ===== config.js ===== */
 // ====== 这里是可以改的设置 ======
 window.APP_CONFIG = {
@@ -14,34 +14,61 @@ window.APP_CONFIG = {
 
 /* ===== questions.js ===== */
 // 问题库：想加、想改直接编辑这里（保持 JSON 格式），然后运行 make_question_audio.py 重新生成语音。
-// id 只用英文和横线（会当文件名用）；stage 是阶段标签；text 是读给奶奶听、显示给奶奶看的问题。
+// id 只用英文和横线（会当文件名，已有录音的 id 不要改）；stage 是阶段；text 是读给奶奶听、显示给奶奶看的问题；
+// followups 是讲完一段后接着问的追问（每条一句，开放式）。轻松的问题排前面，伤心的放最后。
 window.QUESTIONS = [
-  {"id": "childhood-home",    "stage": "童年",      "text": "您小时候住在哪里？家里是什么样子的？"},
-  {"id": "childhood-home-2",    "stage": "童年",      "text": "您小时候家里有几口人？大院子里是怎么个情况？"},
-  {"id": "parents",           "stage": "童年",      "text": "您的爸爸妈妈是什么样的人？您对您的爸爸妈妈还有什么样的映像？"},
-  {"id": "parents-2",           "stage": "童年",      "text": "您的爸爸妈妈是怎么去世的？"},
-  {"id": "childhood-happy",   "stage": "童年",      "text": "您小时候最满意最开心的一件事是什么？"},
-  {"id": "childhood-food",    "stage": "童年",      "text": "小时候家里都吃些什么？您最爱吃什么？"},
-  {"id": "school",            "stage": "童年",      "text": "您上过学吗？还记得学校里的事情吗？"},
-  {"id": "siblings",          "stage": "童年",      "text": "您有几个兄弟姐妹？小时候你们常在一起做什么？"},
-  {"id": "hometown",          "stage": "家乡",      "text": "您年轻的时候，那个时候棉竹是什么样子的？成都又是啥子样子的"},
-  {"id": "festival",          "stage": "家乡",      "text": "小时候过年是怎么过的？"},
-  {"id": "young-dream",       "stage": "年轻时候",  "text": "您年轻的时候，最大的心愿是什么？"},
-  {"id": "first-job",         "stage": "年轻时候",  "text": "您以前是从什么时候开始下田干活的？能挣多少工分？"},
-  {"id": "meet-husband",      "stage": "爱情和婚姻", "text": "您和您的丈夫是怎么认识的？"},
-  {"id": "after-marriage",    "stage": "爱情和婚姻", "text": "你和你丈夫结婚以后，日子是怎么过的？过得怎么样？"},
-  {"id": "wedding",           "stage": "爱情和婚姻", "text": "您结婚那天是什么样的？"},
-  {"id": "marriage-life",     "stage": "爱情和婚姻", "text": "刚结婚的时候，你们的日子是怎么过的？"},
-  {"id": "first-child",       "stage": "孩子",      "text": "第一个孩子大姐出生的时候，您是什么心情？有什么想法？当时家里情况怎么样？"},
-  {"id": "second-child",       "stage": "孩子",      "text": "第二个孩子二姐出生的时候，您是什么心情？有什么想法？当时家里情况怎么样？"},
-  {"id": "third-child",       "stage": "孩子",      "text": "第三个孩子龙儿子出生的时候，您是什么心情？有什么想法？当时家里情况怎么样？"},
-  {"id": "raising-kids",      "stage": "孩子",      "text": "带孩子，孩子长大的那些年，最难忘的是什么？"},
-  {"id": "hard-times",        "stage": "人生",      "text": "这辈子最辛苦的一段日子是什么时候？是怎么熬过来的？"},
-  {"id": "proud",             "stage": "人生",      "text": "您这辈子最骄傲的一件事是什么？"},
-  {"id": "unforgettable-day", "stage": "人生",      "text": "您最难忘的一天是哪一天？"},
-  {"id": "advice",            "stage": "人生",      "text": "您最想对孙子孙女说的话是什么？"},
-  {"id": "wish",              "stage": "人生",      "text": "您现在最大的心愿是什么？"},
-  {"id": "regret",              "stage": "人生",      "text": "您现在最大的遗憾是什么？"}
+  {"id": "childhood-happy",   "stage": "童年",      "text": "您小时候最满意最开心的一件事是什么？",
+   "followups": ["那后来呢？还有别的开心的事吗？", "那时候您多大？和哪些人在一起？"]},
+  {"id": "childhood-food",    "stage": "童年",      "text": "小时候家里都吃些什么？您最爱吃什么？",
+   "followups": ["是谁做的？怎么做的？", "过节的时候会吃点什么特别的？"]},
+  {"id": "festival",          "stage": "家乡",      "text": "小时候过年是怎么过的？",
+   "followups": ["那后来呢？还有什么热闹的事？", "您最喜欢过年的哪一天？为什么？"]},
+  {"id": "childhood-home",    "stage": "童年",      "text": "您小时候住在哪里？家里是什么样子的？",
+   "followups": ["屋里屋外都有些什么？", "您最喜欢待在家里的哪个地方？"]},
+  {"id": "childhood-home-2",  "stage": "童年",      "text": "您小时候家里有几口人？大院子里是怎么个情况？",
+   "followups": ["院子里的邻居都是些什么人？", "大家平时是怎么相处的？"]},
+  {"id": "parents",           "stage": "童年",      "text": "您的爸爸妈妈是什么样的人？您对您的爸爸妈妈还有什么样的印象？",
+   "followups": ["他们平时都做些什么？", "您最记得他们说过的一句话是什么？"]},
+  {"id": "school",            "stage": "童年",      "text": "您上过学吗？还记得学校里的事情吗？",
+   "followups": ["老师是什么样的人？", "同学里头有没有到现在还记得的？"]},
+  {"id": "siblings",          "stage": "童年",      "text": "您有几个兄弟姐妹？小时候你们常在一起做什么？",
+   "followups": ["那后来呢？你们长大以后还常来往吗？", "小时候有没有一起闯过祸？"]},
+  {"id": "hometown",          "stage": "家乡",      "text": "您年轻的时候，那个时候绵竹是什么样子的？成都又是啥子样子的？",
+   "followups": ["那时候去一趟成都要怎么走？", "现在和那时候比，变化最大的是什么？"]},
+  {"id": "young-dream",       "stage": "年轻时候",  "text": "您年轻的时候，最大的心愿是什么？",
+   "followups": ["那后来实现了吗？", "当时是什么让您有这个想法的？"]},
+  {"id": "first-job",         "stage": "年轻时候",  "text": "您以前是从什么时候开始下田干活的？能挣多少工分？",
+   "followups": ["一天下来累不累？大家怎么歇气？", "挣的工分能换到些什么？"]},
+  {"id": "meet-husband",      "stage": "爱情和婚姻", "text": "您和您的丈夫是怎么认识的？",
+   "followups": ["那后来呢？你们是怎么定下来的？", "您第一眼看到他是什么感觉？"]},
+  {"id": "wedding",           "stage": "爱情和婚姻", "text": "您结婚那天是什么样的？",
+   "followups": ["来了些什么人？吃了些什么？", "那天您穿的什么？"]},
+  {"id": "marriage-life",     "stage": "爱情和婚姻", "text": "刚结婚的时候，你们的日子是怎么过的？",
+   "followups": ["那时候住在哪里？", "有没有特别难忘的一件小事？"]},
+  {"id": "after-marriage",    "stage": "爱情和婚姻", "text": "你和你丈夫结婚以后，日子是怎么过的？过得怎么样？",
+   "followups": ["日子过得最好的是哪几年？", "你们吵过架吗？后来怎么和好的？"]},
+  {"id": "first-child",       "stage": "孩子",      "text": "第一个孩子大姐出生的时候，您是什么心情？有什么想法？当时家里情况怎么样？",
+   "followups": ["那后来呢？她小时候是什么样的？", "名字是谁取的？有什么讲究？"]},
+  {"id": "second-child",      "stage": "孩子",      "text": "第二个孩子二姐出生的时候，您是什么心情？有什么想法？当时家里情况怎么样？",
+   "followups": ["那后来呢？她小时候是什么样的？", "两个女儿小时候处得好吗？"]},
+  {"id": "third-child",       "stage": "孩子",      "text": "第三个孩子龙儿子出生的时候，您是什么心情？有什么想法？当时家里情况怎么样？",
+   "followups": ["那后来呢？他小时候是什么样的？", "家里人是什么反应？"]},
+  {"id": "raising-kids",      "stage": "孩子",      "text": "带孩子，孩子长大的那些年，最难忘的是什么？",
+   "followups": ["那后来呢？", "最操心的是哪一段？"]},
+  {"id": "proud",             "stage": "人生",      "text": "您这辈子最骄傲的一件事是什么？",
+   "followups": ["那后来呢？别人是怎么说的？", "现在想起来是什么感觉？"]},
+  {"id": "unforgettable-day", "stage": "人生",      "text": "您最难忘的一天是哪一天？",
+   "followups": ["那天后来怎么样了？", "为什么这一天让您记到现在？"]},
+  {"id": "advice",            "stage": "人生",      "text": "您最想对孙子孙女说的话是什么？",
+   "followups": ["还有别的想说的吗？", "您希望他们记住您什么？"]},
+  {"id": "wish",              "stage": "人生",      "text": "您现在最大的心愿是什么？",
+   "followups": ["那要怎么样才能实现呢？", "还有别的心愿吗？"]},
+  {"id": "hard-times",        "stage": "人生",      "text": "这辈子最辛苦的一段日子是什么时候？是怎么熬过来的？",
+   "followups": ["那后来是怎么熬过来的？", "那时候谁帮过您？"]},
+  {"id": "regret",            "stage": "人生",      "text": "您现在最大的遗憾是什么？",
+   "followups": ["如果能重来，您会怎么做？", "还有别的遗憾吗？"]},
+  {"id": "parents-2",         "stage": "人生",      "text": "您的爸爸妈妈是怎么去世的？",
+   "followups": ["那时候您在哪里？", "您最想念他们什么？"]}
 ];
 
 /* ===== ui-phrases.js ===== */
@@ -53,13 +80,13 @@ window.UI_PHRASES = {
   "replay":    "再听一遍",
   "record":    "开始录音了，请讲",
   "skip":      "换一个问题",
-  "stop":      "好，录好了",
+  "stop":      "要得，存好了",
   "cancel":    "这段不要了吗",
   "discard":   "好，这段不要了",
   "continue":  "好，继续讲",
   "play":      "放给您听",
   "pause":     "暂停了",
-  "save":      "已经保存好了",
+  "save":      "已经存好了",
   "redo":      "好，重新讲一遍",
   "next":      "下一个问题",
   "bye":       "好，今天先到这里，谢谢您",
@@ -74,7 +101,13 @@ window.UI_PHRASES = {
   "pick_user":    "请问您是哪一位",
   "new_user":     "请输入您的名字",
   "switch_user":  "换一个人",
-  "hello":        "您好，我们开始吧"
+  "hello":        "您好，我们开始吧",
+  "well_done":    "讲得真好",
+  "continue_story": "好，接着讲",
+  "enough":       "今天讲得够多了，歇一歇吧",
+  "draft_found":  "上次讲到一半的故事还在，要存下来吗",
+  "interrupted":  "刚才被打断了，讲到的已经存好了",
+  "listen_again": "再听一遍"
 };
 
 /* ===== storage.js ===== */
@@ -83,7 +116,8 @@ window.UI_PHRASES = {
 window.StoryStore = (() => {
   const DB_NAME = 'grandma-stories';
   const STORE = 'stories';
-  const VERSION = 1;
+  const VERSION = 2;
+  const DRAFTS = 'drafts';
 
   function open() {
     return new Promise((resolve, reject) => {
@@ -92,6 +126,7 @@ window.StoryStore = (() => {
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(DRAFTS)) db.createObjectStore(DRAFTS, { keyPath: 'id' });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error || new Error('indexedDB open failed'));
@@ -99,12 +134,12 @@ window.StoryStore = (() => {
     });
   }
 
-  async function run(mode, fn) {
+  async function run(mode, fn, store = STORE) {
     const db = await open();
     return new Promise((resolve, reject) => {
       let tx;
-      try { tx = db.transaction(STORE, mode); } catch (e) { db.close(); return reject(e); }
-      const req = fn(tx.objectStore(STORE));
+      try { tx = db.transaction(store, mode); } catch (e) { db.close(); return reject(e); }
+      const req = fn(tx.objectStore(store));
       tx.oncomplete = () => { db.close(); resolve(req ? req.result : undefined); };
       tx.onerror = () => { db.close(); reject(tx.error || new Error('indexedDB tx failed')); };
       tx.onabort = () => { db.close(); reject(tx.error || new Error('indexedDB tx aborted')); };
@@ -140,6 +175,14 @@ window.StoryStore = (() => {
       return list.map(hydrate).filter((r) => !userId || r.user === userId).sort((a, b) => b.createdAt - a.createdAt);
     },
     remove: (id) => run('readwrite', (s) => s.delete(id)),
+    // 录音草稿：录到一半页面被杀也能找回。chunks 是 Int16Array 数组，追加保存
+    async appendDraft(info, chunks) {
+      const cur = (await run('readonly', (s) => s.get('current'), DRAFTS)) || { id: 'current', parts: [] };
+      const rec = { ...cur, ...info, id: 'current', parts: cur.parts.concat(chunks.map((c) => c.buffer.slice(c.byteOffset, c.byteOffset + c.byteLength))), updatedAt: Date.now() };
+      return run('readwrite', (s) => s.put(rec), DRAFTS);
+    },
+    loadDraft: () => run('readonly', (s) => s.get('current'), DRAFTS),
+    clearDraft: () => run('readwrite', (s) => s.delete('current'), DRAFTS),
   };
 })();
 
@@ -235,6 +278,7 @@ window.WavRecorder = (() => {
   const TARGET = 16000;
   let ctx = null, stream = null, source = null, processor = null, mute = null;
   let chunks = [], leftover = null, capturing = false, inputRate = TARGET, samples = 0;
+  let drained = 0, onInterrupted = null;
 
   function supported() {
     return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (window.AudioContext || window.webkitAudioContext));
@@ -271,6 +315,10 @@ window.WavRecorder = (() => {
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
     inputRate = ctx.sampleRate;
+    // 来电话、被别的 App 抢走麦克风、iPhone 锁屏：轨道会结束或 AudioContext 变成 interrupted，通知上层赶紧把讲到的存下来
+    const track = stream.getAudioTracks()[0];
+    if (track) track.onended = () => { if (capturing && onInterrupted) onInterrupted('track-ended'); };
+    ctx.onstatechange = () => { if (capturing && ctx.state !== 'running' && onInterrupted) onInterrupted('audiocontext-' + ctx.state); };
     source = ctx.createMediaStreamSource(stream);
     processor = ctx.createScriptProcessor(4096, 1, 1);
     mute = ctx.createGain();
@@ -280,7 +328,9 @@ window.WavRecorder = (() => {
     processor.connect(mute);
     mute.connect(ctx.destination);
   }
-  function start() { chunks = []; leftover = null; samples = 0; capturing = true; }
+  function start() { chunks = []; leftover = null; samples = 0; drained = 0; capturing = true; }
+  // 把上次 drain 之后新采到的块交出去（用来每隔几秒存草稿）
+  function drain() { const out = chunks.slice(drained); drained = chunks.length; return out; }
   function pause() { capturing = false; }
   function resume() { capturing = true; }
   function close() {
@@ -308,7 +358,9 @@ window.WavRecorder = (() => {
     for (const p of parts) { out.set(p, off); off += p.length; }
     return new Blob([buf], { type: 'audio/wav' });
   }
-  return { supported, ensureContext, open, start, pause, resume, stop, cancel, seconds: () => samples / TARGET };
+  return { supported, ensureContext, open, start, pause, resume, stop, cancel, drain, encodeWav,
+    seconds: () => samples / TARGET, isCapturing: () => capturing,
+    onInterrupted: (cb) => { onInterrupted = cb; } };
 })();
 
 /* ===== app.js ===== */
@@ -333,14 +385,19 @@ window.WavRecorder = (() => {
     CONFIG.serverUrl = location.origin;
   }
   const serverBase = () => CONFIG.serverUrl.replace(/\/$/, '');
-  const IN_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
   const authHeaders = () => (CONFIG.serverToken ? { 'X-Token': CONFIG.serverToken } : {});
+  const IN_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
+  const MAX_PER_SESSION = 3;               // 一次打开讲满这么多段就提示歇一歇
 
   // 把手机上出的错发给电脑记着，方便远程排查（不带口令也能发，只记几百字）
   const errStr = (e) => (e && (e.name ? e.name + ': ' : '') + (e.message || String(e))) || 'unknown';
+  const reported = {};
   function report(kind, detail) {
     try {
       if (!CONFIG.serverUrl) return;
+      const key = kind + '|' + String(detail || '').slice(0, 40);
+      if (reported[key] && Date.now() - reported[key] < 5 * 60 * 1000) return;
+      reported[key] = Date.now();
       const body = JSON.stringify({ kind, detail: String(detail || '').slice(0, 600), ua: navigator.userAgent,
         url: location.href.replace(/token=[^&]+/, 'token=***'), at: new Date().toISOString() });
       fetch(serverBase() + '/api/client-log', { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
@@ -349,6 +406,13 @@ window.WavRecorder = (() => {
   window.addEventListener('error', (e) => report('js-error', (e.message || '') + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno));
   window.addEventListener('unhandledrejection', (e) => report('promise-rejection', e.reason && (e.reason.stack || e.reason.message || e.reason)));
 
+  // 跨境网络：每个请求都有超时，免得一个卡住的连接把同步永远堵死
+  function fetchT(url, opts, ms) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms);
+    return fetch(url, Object.assign({}, opts, { signal: ctl.signal })).finally(() => clearTimeout(t));
+  }
+
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const playbackAudio = $('#playback-audio');
@@ -356,10 +420,11 @@ window.WavRecorder = (() => {
 
   const state = {
     user: null,                                  // {id, name}：当前是谁在用
-    stories: [], current: null, detailId: null,
+    stories: [], current: null, currentFollowup: '', followupIndex: 0, detailId: null,
     blob: null, seconds: 0, timer: null, recording: false, paused: false,
     recognition: null, transcript: '', sessionFinal: '', interim: '',
-    wakeLock: null, demoTimer: null, playUrl: null,
+    wakeLock: null, demoTimer: null, playUrl: null, draftTimer: null,
+    sessionCount: 0, asked: {}, parentByQuestion: {}, lastSavedId: null,
   };
 
   // ====== 页面切换 / 弹窗 ======
@@ -394,6 +459,7 @@ window.WavRecorder = (() => {
     const d = new Date(ts);
     return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
   };
+  const questionById = (id) => (window.QUESTIONS || []).find((q) => q.id === id);
 
   // ====== 每个按键的语音反馈：带 data-say 的按钮，点下去先读一句 ======
   let audioUnlocked = false;
@@ -414,7 +480,7 @@ window.WavRecorder = (() => {
   async function fetchUsers() {
     if (!CONFIG.serverUrl) return localUsers();
     try {
-      const r = await fetch(serverBase() + '/api/users', { headers: authHeaders() });
+      const r = await fetchT(serverBase() + '/api/users', { headers: authHeaders() }, 15000);
       if (r.ok) return await r.json();
     } catch (_) {}
     return localUsers();
@@ -422,13 +488,12 @@ window.WavRecorder = (() => {
   async function createUser(name) {
     if (CONFIG.serverUrl) {
       try {
-        const r = await fetch(serverBase() + '/api/users', { method: 'POST', body: JSON.stringify({ name }), headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()) });
+        const r = await fetchT(serverBase() + '/api/users', { method: 'POST', body: JSON.stringify({ name }), headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()) }, 15000);
         if (r.ok) return await r.json();
         report('create-user-failed', 'HTTP ' + r.status);
       } catch (e) { report('create-user-failed', errStr(e)); }
     }
-    // 电脑没连上：先在手机上建一个，id 用名字算出来，以后同名会合并
-    let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;   // 电脑没连上：先在手机上建一个
     return { id: 'u' + h.toString(16), name };
   }
   async function showUserScreen() {
@@ -449,6 +514,7 @@ window.WavRecorder = (() => {
     state.user = u;
     saveUser(u);
     rememberLocalUser(u);
+    state.asked = {}; state.parentByQuestion = {}; state.sessionCount = 0;
     $$('.name').forEach((el) => { el.textContent = u.name; });
     $('#home-user').textContent = '现在是：' + u.name;
     try { state.stories = await StoryStore.all(u.id); } catch (e) { state.stories = []; report('idb-open-failed', errStr(e)); }
@@ -456,6 +522,7 @@ window.WavRecorder = (() => {
     show('home');
     refreshFromServer().then(() => renderHome());
     syncSoon(1000);
+    checkDraft();
   }
   async function submitNewUser() {
     const input = $('#user-name-input');
@@ -471,22 +538,30 @@ window.WavRecorder = (() => {
     selectUser(u);
   }
 
-  // ====== 选问题：先问没讲过的，都讲过了就从头再来 ======
+  // ====== 选问题：没讲过的在前，「换一个问题」跳过的排到最后，都讲过了就从头再来 ======
+  function skippedSet() { try { return new Set(JSON.parse(localStorage.getItem('skipped:' + (state.user ? state.user.id : '')) || '[]')); } catch (_) { return new Set(); } }
+  function markSkipped(id) { const s = skippedSet(); s.add(id); try { localStorage.setItem('skipped:' + (state.user ? state.user.id : ''), JSON.stringify([...s])); } catch (_) {} }
   function nextQuestion(after) {
     const list = window.QUESTIONS;
     const done = new Set(state.stories.map((s) => s.questionId));
+    const skipped = skippedSet();
     const start = after ? (list.findIndex((q) => q.id === after.id) + 1) % list.length : 0;
-    for (let i = 0; i < list.length; i++) {
-      const q = list[(start + i) % list.length];
-      if (!done.has(q.id)) return q;
-    }
-    return list[start];
+    const ordered = [];
+    for (let i = 0; i < list.length; i++) ordered.push(list[(start + i) % list.length]);
+    return ordered.find((q) => !done.has(q.id) && !skipped.has(q.id))
+      || ordered.find((q) => !done.has(q.id))
+      || ordered[0];
   }
   function openQuestion(q) {
     state.current = q;
+    state.currentFollowup = '';
+    const done = state.stories.filter((s) => s.questionId === q.id).length;
+    const total = window.QUESTIONS.length;
+    const answered = new Set(state.stories.map((s) => s.questionId)).size;
     $('#q-stage').textContent = '关于' + q.stage;
+    $('#q-progress').textContent = answered ? `已经讲了 ${answered} 个，还有 ${total - answered} 个没讲` : '请听问题：';
     $('#q-text').textContent = q.text;
-    $('#q-answered').hidden = !state.stories.some((s) => s.questionId === q.id);
+    $('#q-answered').hidden = !done;
     show('question');
     Speaker.question(q);            // 排在按键反馈后面读
   }
@@ -499,13 +574,16 @@ window.WavRecorder = (() => {
     el.classList.toggle('empty', !t);
     el.scrollTop = el.scrollHeight;
   }
+  let wakeReported = false;
   async function keepScreenOn() {
-    try { if (navigator.wakeLock) state.wakeLock = await navigator.wakeLock.request('screen'); } catch (_) {}
+    try {
+      if (navigator.wakeLock) state.wakeLock = await navigator.wakeLock.request('screen');
+      else if (!wakeReported) { wakeReported = true; report('no-wakelock', 'screen may lock during recording'); }
+    } catch (_) {}
   }
   function releaseScreen() {
     if (state.wakeLock) { state.wakeLock.release().catch(() => {}); state.wakeLock = null; }
   }
-
   // 微信里录不了音（老 iPhone、微信没给麦克风权限）：教她点右上角「···」在浏览器打开
   function micUnavailable(err) {
     report('mic-unavailable', (err ? errStr(err) : 'unsupported') + (IN_WECHAT ? ' (wechat)' : ''));
@@ -524,13 +602,11 @@ window.WavRecorder = (() => {
   async function startRecording() {
     const q = state.current;
     const recBtn = $('#btn-record');
-    const feedback = Speaker.last;                 // 「开始录音了，请讲」正在播
+    const feedback = Speaker.last;                 // 「开始录音了，请讲」/「好，接着讲」正在播
     state.blob = null; state.transcript = ''; state.sessionFinal = ''; state.interim = '';
 
     if (!DEMO) {
-      if (!WavRecorder.supported()) {
-        micUnavailable(); return;
-      }
+      if (!WavRecorder.supported()) { micUnavailable(); return; }
       WavRecorder.ensureContext();                 // 必须在点按里同步创建（iPhone 要求）
       recBtn.disabled = true;
       recBtn.textContent = '正在打开麦克风…';
@@ -549,38 +625,80 @@ window.WavRecorder = (() => {
     if (!DEMO) WavRecorder.start();
 
     state.recording = true; state.paused = false;
-    $('#rec-question').textContent = q.text;
+    $('#rec-question').textContent = state.currentFollowup || q.text;
     renderTranscript($('#rec-transcript'), '', '（您说的话会一句一句显示在这里）');
     state.seconds = 0;
     renderTimer();
-    state.timer = setInterval(() => { if (!state.paused) { state.seconds++; renderTimer(); } }, 1000);
+    state.timer = setInterval(() => { if (!state.paused) { state.seconds = DEMO ? state.seconds + 1 : Math.floor(WavRecorder.seconds()); renderTimer(); } }, 1000);
     startRecognition();
     keepScreenOn();
+    startDraftSaving();
     show('recording');
   }
 
   function finishCapture() {
     state.recording = false; state.paused = false;
     clearInterval(state.timer);
+    clearInterval(state.draftTimer);
     stopRecognition();
     releaseScreen();
   }
+  // 「讲完了」：先停录、立刻存到手机，再说话；上传放到后台
   function stopRecording() {
     if (!state.recording) return;
     finishCapture();
-    state.blob = DEMO ? silentWav(Math.max(1, state.seconds)) : WavRecorder.stop();   // 先停录，再说话
+    state.blob = DEMO ? silentWav(Math.max(1, state.seconds)) : WavRecorder.stop();
+    if (!DEMO) state.seconds = Math.max(1, Math.round(WavRecorder.seconds()));
     Speaker.say('stop');
-    openReview();
+    saveStory({});
   }
-  async function cancelRecording() {
+  // 来电话、锁屏、切到别的 App、被别的 App 抢走麦克风：把讲到的存下来，不丢
+  function handleInterruption(why) {
     if (!state.recording) return;
-    state.paused = true;                           // 弹窗期间先暂停，别把提示音录进去
-    if (!DEMO) WavRecorder.pause();
-    const yes = await ask('这段不要了？', '不保存，回到问题重新来', '不要了', '继续讲', 'discard', 'continue');
-    if (!yes) { state.paused = false; if (!DEMO) WavRecorder.resume(); return; }
+    report('recording-interrupted', why);
     finishCapture();
-    if (!DEMO) WavRecorder.cancel();
-    openQuestion(state.current);
+    state.blob = DEMO ? silentWav(Math.max(1, state.seconds)) : WavRecorder.stop();
+    if (!DEMO) state.seconds = Math.max(1, Math.round(WavRecorder.seconds()));
+    saveStory({ interrupted: true });
+  }
+  WavRecorder.onInterrupted(handleInterruption);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { if (state.recording) handleInterruption('page-hidden'); }
+    else syncSoon(500);
+  });
+  window.addEventListener('pagehide', () => { if (state.recording) handleInterruption('pagehide'); });
+
+  // ====== 草稿：录音时每 10 秒把采到的声音存进手机，页面被杀也能找回 ======
+  function startDraftSaving() {
+    clearInterval(state.draftTimer);
+    if (DEMO) return;
+    const info = { user: state.user ? state.user.id : '', userName: state.user ? state.user.name : '',
+      questionId: state.current.id, question: state.current.text, stage: state.current.stage,
+      followup: state.currentFollowup || '', startedAt: Date.now() };
+    state.draftTimer = setInterval(async () => {
+      if (!state.recording) return;
+      const parts = WavRecorder.drain();
+      if (!parts.length) return;
+      try { await StoryStore.appendDraft(info, parts); } catch (e) { clearInterval(state.draftTimer); report('draft-failed', errStr(e)); }
+    }, 10000);
+  }
+  async function checkDraft() {
+    let d = null;
+    try { d = await StoryStore.loadDraft(); } catch (_) { return; }
+    if (!d || !d.parts || !d.parts.length) return;
+    if (state.user && d.user && d.user !== state.user.id) return;      // 别人的草稿不动
+    const n = d.parts.reduce((a, b) => a + b.byteLength, 0) / 2;
+    if (n < 16000 * 3) { try { await StoryStore.clearDraft(); } catch (_) {} return; }
+    const yes = await ask('上次讲到一半的故事还在', `${d.question || ''}（约 ${fmtDuration(Math.round(n / 16000))}）要存下来吗？`, '存下来', '不要了', 'save', 'discard');
+    Speaker.say('draft_found');
+    if (!yes) { try { await StoryStore.clearDraft(); } catch (_) {} return; }
+    const chunks = d.parts.map((b) => new Int16Array(b));
+    state.blob = WavRecorder.encodeWav(chunks, n, 16000);
+    state.seconds = Math.round(n / 16000);
+    state.current = questionById(d.questionId) || { id: d.questionId || 'draft', text: d.question || '未知问题', stage: d.stage || '' };
+    state.currentFollowup = d.followup || '';
+    state.transcript = '';
+    await saveStory({ interrupted: true, fromDraft: true });
   }
 
   // ====== 手机上的初步转文字（普通话引擎，四川话不准；只是给个即时反馈，最终以电脑整理的为准） ======
@@ -664,28 +782,16 @@ window.WavRecorder = (() => {
     playbackAudio.onended = () => { btn.textContent = '▶️ 再听一遍'; };
   }
 
-  // ====== 录好了 / 保存 ======
-  function openReview() {
+  // ====== 保存：先存手机（存不了也先留在内存），马上进「存好了」页；上传在后台做 ======
+  async function saveStory(opts) {
     const q = state.current;
-    $('#rv-stage').textContent = '关于' + q.stage;
-    $('#rv-question').textContent = q.text;
-    $('#rv-duration').textContent = '（' + fmtDuration(state.seconds) + '）';
-    const has = !!state.transcript.trim();
-    renderTranscript($('#rv-transcript'), state.transcript, '保存以后，电脑会把这段话整理成文字。');
-    $('#rv-status').textContent = has ? '这是手机的初步识别，四川话可能不准；保存后电脑会重新整理。' : '';
-    setupPlayer($('#btn-play'), state.blob);
-    show('review');
-  }
-  async function saveStory() {
-    const q = state.current;
-    const btn = $('#btn-save');
-    const label = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = '正在保存…';
+    const parentId = state.currentFollowup ? (state.parentByQuestion[q.id] || '') : '';
     const story = {
       id: (state.user ? state.user.id + '-' : '') + String(Date.now()),
       user: state.user ? state.user.id : '', userName: state.user ? state.user.name : '',
       questionId: q.id, question: q.text, stage: q.stage,
+      followup: state.currentFollowup || '', followupIndex: state.currentFollowup ? state.followupIndex : 0, parentId,
+      interrupted: !!opts.interrupted,
       text: state.transcript.trim(), liveText: state.transcript.trim(), serverText: '',
       serverStatus: 'none', uploaded: false,
       createdAt: Date.now(), duration: state.seconds,
@@ -695,26 +801,45 @@ window.WavRecorder = (() => {
     let localOk = false;
     try { await StoryStore.save(story); localOk = true; }
     catch (e) { report('idb-save-failed', errStr(e)); }
+    try { await StoryStore.clearDraft(); } catch (_) {}
     state.stories = state.stories.filter((x) => x.id !== story.id);
     state.stories.unshift(story);                       // 存不进手机也先留在内存里
-    let uploadOk = false;
-    if (CONFIG.serverUrl) {
-      uploadOk = await uploadStory(story);
-      if (uploadOk) {
-        story.uploaded = true; story.serverStatus = 'pending';
-        if (localOk) { try { await StoryStore.save(story); } catch (_) {} }
-      }
-    }
-    btn.disabled = false;
-    btn.textContent = label;
-    if (!localOk && !uploadOk) {
-      showMessage('没存上', CONFIG.serverUrl ? '手机存不下，电脑也没连上。请检查网络，再按一次「保存」' : '手机存不下这段录音，请让家人看看');
-      return;
-    }
-    $('#saved-note').textContent = uploadOk ? '已经传到电脑上了' : '先存在手机里，连上电脑后会自动传过去';
+    if (!state.currentFollowup) state.parentByQuestion[q.id] = story.id;
+    state.asked[q.id] = (state.asked[q.id] || 0) + (state.currentFollowup ? 1 : 0);
+    state.sessionCount += 1;
+    state.lastSavedId = story.id;
+    renderSaved(story, localOk);
     stopPlayback();
     show('saved');
-    syncSoon(3000);
+    syncSoon(0);                                        // 后台上传
+    if (!localOk && !CONFIG.serverUrl) showMessage('没存上', '手机存不下这段录音，请让家人看看');
+  }
+  function renderSaved(story, localOk) {
+    const q = state.current;
+    $('#sv-stage').textContent = '关于' + q.stage;
+    $('#sv-duration').textContent = '（' + fmtDuration(story.duration) + '）';
+    $('#saved-note').textContent = story.interrupted ? '刚才被打断了，讲到的已经存好了。' : (CONFIG.serverUrl ? '正在传到电脑…' : (localOk ? '已经存在手机里' : ''));
+    setupPlayer($('#btn-play-saved'), story.audio);
+    // 追问：这个问题还有没问过的追问、这次打开还没讲满，就接着问
+    const fus = q.followups || [];
+    const idx = state.asked[q.id] || 0;
+    const enough = state.sessionCount >= MAX_PER_SESSION;
+    const fu = (!enough && idx < fus.length) ? fus[idx] : '';
+    state.followupIndex = idx + 1;
+    $('#sv-followup-label').hidden = !fu;
+    $('#sv-followup').textContent = fu || (enough ? '今天讲得够多了，歇一歇吧。' : '');
+    $('#btn-continue').hidden = !fu;
+    $('#btn-home-2').textContent = enough ? '🏠 今天讲得够多了，歇一歇' : '🏠 今天先到这里';
+    $('#btn-home-2').dataset.say = enough ? 'enough' : 'bye';
+    if (story.interrupted) Speaker.say('interrupted', { clear: false });
+    if (fu) { Speaker.say('well_done', { clear: false }); Speaker.question({ id: q.id + '-f' + (idx + 1), text: fu }); }
+    else if (enough) Speaker.say('enough', { clear: false });
+    state.pendingFollowup = fu;
+  }
+  function continueStory() {
+    if (!state.pendingFollowup) return;
+    state.currentFollowup = state.pendingFollowup;
+    startRecording();
   }
 
   // ====== 和电脑同步：上传录音，取回电脑整理好的文字 ======
@@ -726,27 +851,43 @@ window.WavRecorder = (() => {
       const { audio, ...meta } = s;
       fd.append('meta', JSON.stringify(meta));
       if (audio) fd.append('audio', audio, s.filename);
-      const r = await fetch(serverBase() + '/api/stories', { method: 'POST', body: fd, headers: authHeaders() });
+      const mb = audio ? audio.size / 1048576 : 0;
+      const r = await fetchT(serverBase() + '/api/stories', { method: 'POST', body: fd, headers: authHeaders() }, 30000 + 30000 * mb);
       if (!r.ok) report('upload-failed', 'HTTP ' + r.status);
       return r.ok;
     } catch (e) { report('upload-failed', errStr(e)); return false; }
   }
   async function fetchStatus(id) {
     try {
-      const r = await fetch(serverBase() + '/api/stories/' + encodeURIComponent(id), { headers: authHeaders() });
+      const r = await fetchT(serverBase() + '/api/stories/' + encodeURIComponent(id), { headers: authHeaders() }, 20000);
       return r.ok ? await r.json() : null;
     } catch (_) { return null; }
+  }
+  function pendingDeletes() { try { return JSON.parse(localStorage.getItem('pendingDeletes') || '[]'); } catch (_) { return []; } }
+  function setPendingDeletes(list) { try { localStorage.setItem('pendingDeletes', JSON.stringify(list)); } catch (_) {} }
+  async function deleteOnServer(id) {
+    if (!CONFIG.serverUrl) return true;
+    try {
+      const r = await fetchT(serverBase() + '/api/stories/' + encodeURIComponent(id), { method: 'DELETE', headers: authHeaders() }, 20000);
+      return r.ok || r.status === 404;
+    } catch (e) { report('delete-failed', errStr(e)); return false; }
+  }
+  async function flushPendingDeletes() {
+    const list = pendingDeletes();
+    if (!list.length || !CONFIG.serverUrl) return;
+    const left = [];
+    for (const id of list) { if (!(await deleteOnServer(id))) left.push(id); }
+    setPendingDeletes(left);
   }
   async function syncNow() {
     if (syncing || !CONFIG.serverUrl) return;
     syncing = true;
-    await flushPendingDeletes();
     let again = 0;
     try {
+      await flushPendingDeletes();
       for (const s of state.stories) {
-        if (Date.now() - s.createdAt > 30 * 24 * 3600 * 1000) continue;
         if (!s.uploaded) {
-          if (await uploadStory(s)) { s.uploaded = true; s.serverStatus = 'pending'; await StoryStore.save(s); refreshStoryViews(s); }
+          if (await uploadStory(s)) { s.uploaded = true; s.serverStatus = 'pending'; try { await StoryStore.save(s); } catch (_) {} refreshStoryViews(s); }
           else { again = Math.max(again, 30000); continue; }
         }
         if (s.serverStatus === 'pending') {
@@ -754,12 +895,12 @@ window.WavRecorder = (() => {
           if (r && r.status === 'done') {
             s.serverStatus = 'done'; s.serverText = r.text || '';
             if (s.serverText) s.text = s.serverText;
-            await StoryStore.save(s); refreshStoryViews(s);
+            try { await StoryStore.save(s); } catch (_) {} refreshStoryViews(s);
           } else if (r && r.status === 'failed') {
             s.serverStatus = 'failed'; s.serverError = r.error || '';
-            await StoryStore.save(s); refreshStoryViews(s);
+            try { await StoryStore.save(s); } catch (_) {} refreshStoryViews(s);
           } else if (r && r.status === 'missing') {
-            s.uploaded = false; await StoryStore.save(s); again = Math.max(again, 5000);
+            s.uploaded = false; try { await StoryStore.save(s); } catch (_) {} again = Math.max(again, 5000);
           } else {
             again = Math.max(again, 5000);
           }
@@ -769,11 +910,10 @@ window.WavRecorder = (() => {
     if (again) syncSoon(again);
   }
   async function refreshFromServer() {
-    if (!CONFIG.serverUrl) return false;
+    if (!CONFIG.serverUrl || !state.user) return false;
     let remote = [];
     try {
-      if (!state.user) return false;
-      const r = await fetch(serverBase() + '/api/stories?user=' + encodeURIComponent(state.user.id), { headers: authHeaders() });
+      const r = await fetchT(serverBase() + '/api/stories?user=' + encodeURIComponent(state.user.id), { headers: authHeaders() }, 20000);
       if (!r.ok) return false;
       remote = await r.json();
     } catch (_) { return false; }
@@ -792,6 +932,7 @@ window.WavRecorder = (() => {
       }
       state.stories.push({
         id: m.id, user: m.user || '', userName: m.userName || '', questionId: m.questionId, question: m.question || '', stage: m.stage || '',
+        followup: m.followup || '', interrupted: !!m.interrupted,
         createdAt: Number(m.createdAt) || 0, duration: Number(m.duration) || 0,
         text: m.text || m.clientText || '', serverText: m.text || '',
         serverStatus: m.status === 'done' ? 'done' : (m.status === 'failed' ? 'failed' : 'pending'),
@@ -803,16 +944,24 @@ window.WavRecorder = (() => {
     if (changed) state.stories.sort((a, b) => b.createdAt - a.createdAt);
     return changed;
   }
-  // ====== 删除已保存的录音：手机上删掉，电脑上移到 _deleted（可找回）======
-  function pendingDeletes() { try { return JSON.parse(localStorage.getItem('pendingDeletes') || '[]'); } catch (_) { return []; } }
-  function setPendingDeletes(list) { try { localStorage.setItem('pendingDeletes', JSON.stringify(list)); } catch (_) {} }
-  async function deleteOnServer(id) {
-    if (!CONFIG.serverUrl) return true;
-    try {
-      const r = await fetch(serverBase() + '/api/stories/' + encodeURIComponent(id), { method: 'DELETE', headers: authHeaders() });
-      return r.ok || r.status === 404;
-    } catch (e) { report('delete-failed', errStr(e)); return false; }
+  function refreshStoryViews(s) {
+    const active = document.querySelector('.screen.active');
+    if (!active) return;
+    if (active.id === 'screen-saved' && state.lastSavedId === s.id && !s.interrupted) {
+      $('#saved-note').textContent = s.uploaded ? (s.serverStatus === 'done' ? '已经传到电脑，文字也整理好了' : '已经传到电脑上了') : '正在传到电脑…';
+    }
+    if (active.id === 'screen-detail' && state.detailId === s.id) openDetail(s, true);
+    if (active.id === 'screen-list') renderList();
   }
+  function statusLine(s) {
+    if (s.serverStatus === 'done') return '';
+    if (s.serverStatus === 'pending') return '电脑正在整理文字（四川话识别）…';
+    if (s.serverStatus === 'failed') return '文字整理没成功，家人会在电脑上处理。';
+    if (!CONFIG.serverUrl) return '';
+    return '还没传到电脑，连上网以后会自动上传。';
+  }
+
+  // ====== 删除已保存的录音：手机上删掉，电脑上移到 _deleted（可找回）======
   async function deleteStory(s) {
     const yes = await ask('真的要删掉这段吗？', '删掉以后手机上就没有了', '删掉', '不删，留着', 'deleted', 'keep');
     if (!yes) return;
@@ -824,31 +973,11 @@ window.WavRecorder = (() => {
     renderList();
     show('list');
   }
-  async function flushPendingDeletes() {
-    const list = pendingDeletes();
-    if (!list.length || !CONFIG.serverUrl) return;
-    const left = [];
-    for (const id of list) { if (!(await deleteOnServer(id))) left.push(id); }
-    setPendingDeletes(left);
-  }
-  function refreshStoryViews(s) {
-    const active = document.querySelector('.screen.active');
-    if (!active) return;
-    if (active.id === 'screen-detail' && state.detailId === s.id) openDetail(s, true);
-    if (active.id === 'screen-list') renderList();
-  }
-  function statusLine(s) {
-    if (s.serverStatus === 'done') return '';
-    if (s.serverStatus === 'pending') return '电脑正在整理文字（四川话识别）…';
-    if (s.serverStatus === 'failed') return '文字整理没成功，请让家人看看电脑上的记录。';
-    if (!CONFIG.serverUrl) return '';
-    return '还没传到电脑，连上网以后会自动上传。';
-  }
 
   // ====== 讲过的故事 ======
   function renderHome() {
     const n = state.stories.length;
-    $('#home-count').textContent = n ? `已经讲了 ${n} 个故事` : '还没有开始讲，今天就开始吧';
+    $('#home-count').textContent = n ? `已经讲了 ${n} 段故事` : '还没有开始讲，今天就开始吧';
     $('#btn-list').textContent = n ? `📖 听听讲过的故事（${n}）` : '📖 听听讲过的故事';
   }
   function renderList() {
@@ -861,7 +990,7 @@ window.WavRecorder = (() => {
       b.type = 'button';
       b.dataset.say = 'open';
       b.innerHTML = '<span class="card-arrow">›</span><div class="card-q"></div><div class="card-meta"></div>';
-      b.querySelector('.card-q').textContent = s.question;
+      b.querySelector('.card-q').textContent = s.followup ? `${s.question} — ${s.followup}` : s.question;
       const st = s.serverStatus === 'pending' ? ' · 文字整理中' : (s.text ? '' : ' · 还没有文字');
       b.querySelector('.card-meta').textContent = `${fmtDate(s.createdAt)} · ${fmtDuration(s.duration)}${st}`;
       b.onclick = () => openDetail(s);
@@ -871,7 +1000,7 @@ window.WavRecorder = (() => {
   function openDetail(s, silent) {
     state.detailId = s.id;
     $('#dt-stage').textContent = '关于' + s.stage;
-    $('#dt-question').textContent = s.question;
+    $('#dt-question').textContent = s.followup ? `${s.question}（追问：${s.followup}）` : s.question;
     $('#dt-meta').textContent = `${fmtDate(s.createdAt)} · ${fmtDuration(s.duration)}`;
     $('#dt-status').textContent = statusLine(s);
     renderTranscript($('#dt-transcript'), s.text, '这段还没有整理成文字。');
@@ -903,31 +1032,6 @@ window.WavRecorder = (() => {
     else document.addEventListener('WeixinJSBridgeReady', apply, false);
   })();
 
-  // ====== 按钮 ======
-  function bind() {
-    $('#btn-start').onclick = () => openQuestion(nextQuestion(null));
-    $('#btn-switch-user').onclick = showUserScreen;
-    $('#btn-user-new').onclick = () => { $('#user-name-error').textContent = ''; show('user-new'); setTimeout(() => $('#user-name-input').focus(), 300); };
-    $('#btn-user-new-back').onclick = showUserScreen;
-    $('#btn-user-create').onclick = submitNewUser;
-    $('#user-name-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitNewUser(); } });
-    $('#btn-list').onclick = () => { renderList(); show('list'); refreshFromServer().then((c) => { if (c) renderList(); }); };
-    $('#btn-q-home').onclick = () => { renderHome(); show('home'); };
-    $('#btn-replay').onclick = () => Speaker.question(state.current);
-    $('#btn-record').onclick = startRecording;
-    $('#btn-skip').onclick = () => openQuestion(nextQuestion(state.current));
-    $('#btn-stop').onclick = stopRecording;
-    $('#btn-cancel-rec').onclick = cancelRecording;
-    $('#btn-save').onclick = saveStory;
-    $('#btn-redo').onclick = () => { stopPlayback(); openQuestion(state.current); };
-    $('#btn-next').onclick = () => openQuestion(nextQuestion(state.current));
-    $('#btn-home-2').onclick = () => { renderHome(); show('home'); };
-    $('#btn-list-back').onclick = () => { stopPlayback(); renderHome(); show('home'); };
-    $('#btn-detail-back').onclick = () => { stopPlayback(); renderList(); show('list'); };
-    $('#btn-detail-delete').onclick = () => { const s = state.stories.find((x) => x.id === state.detailId); if (s) deleteStory(s); };
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) syncSoon(500); });
-  }
-
   // 网址后面加 ?reset：清空这部手机上存的故事（电脑上的不受影响），口令保留
   async function resetLocal() {
     try { await new Promise((r) => { const q = indexedDB.deleteDatabase('grandma-stories'); q.onsuccess = q.onerror = q.onblocked = () => r(); }); } catch (_) {}
@@ -941,6 +1045,29 @@ window.WavRecorder = (() => {
     location.replace(clean.toString());
   }
 
+  // ====== 按钮 ======
+  function bind() {
+    $('#btn-start').onclick = () => openQuestion(nextQuestion(null));
+    $('#btn-switch-user').onclick = showUserScreen;
+    $('#btn-user-new').onclick = () => { $('#user-name-error').textContent = ''; show('user-new'); setTimeout(() => $('#user-name-input').focus(), 300); };
+    $('#btn-user-new-back').onclick = showUserScreen;
+    $('#btn-user-create').onclick = submitNewUser;
+    $('#user-name-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitNewUser(); } });
+    $('#btn-list').onclick = () => { renderList(); show('list'); refreshFromServer().then((c) => { if (c) renderList(); }); };
+    $('#btn-q-home').onclick = () => { renderHome(); show('home'); };
+    $('#btn-replay').onclick = () => Speaker.question(state.current);
+    $('#btn-record').onclick = startRecording;
+    $('#btn-skip').onclick = () => { markSkipped(state.current.id); openQuestion(nextQuestion(state.current)); };
+    $('#btn-stop').onclick = stopRecording;
+    $('#btn-continue').onclick = continueStory;
+    $('#btn-next').onclick = () => openQuestion(nextQuestion(state.current));
+    $('#btn-home-2').onclick = () => { stopPlayback(); renderHome(); show('home'); };
+    $('#btn-saved-home').onclick = () => { stopPlayback(); renderHome(); show('home'); };
+    $('#btn-list-back').onclick = () => { stopPlayback(); renderHome(); show('home'); };
+    $('#btn-detail-back').onclick = () => { stopPlayback(); renderList(); show('list'); };
+    $('#btn-detail-delete').onclick = () => { const s = state.stories.find((x) => x.id === state.detailId); if (s) deleteStory(s); };
+  }
+
   async function init() {
     if (params.has('reset')) { await resetLocal(); return; }
     $$('.name').forEach((el) => { el.textContent = CONFIG.name; });
@@ -951,6 +1078,8 @@ window.WavRecorder = (() => {
       document.body.appendChild(b);
     }
     bind();
+    // ?user=<id>&name=<名字>：家人给奶奶的链接可以直接指定她，不用选人
+    if (params.has('user') && params.has('name')) { await selectUser({ id: params.get('user'), name: params.get('name') }); return; }
     const u = loadUser();
     if (u && u.id) { await selectUser(u); }
     else { showUserScreen(); }
