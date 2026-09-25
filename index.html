@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="theme-color" content="#FFF7EE">
+  <title>奶奶的故事</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 首页 -->
+  <section class="screen active" id="screen-home">
+    <div class="grow center">
+      <div class="hero">👵</div>
+      <h1 class="greeting"><span class="name">奶奶</span>，您好</h1>
+      <p class="sub">今天想听您讲讲以前的事</p>
+      <p class="count" id="home-count">还没有开始讲，今天就开始吧</p>
+    </div>
+    <div class="stack">
+      <button class="btn primary" id="btn-start" type="button">🎙️ 开始讲故事</button>
+      <button class="btn secondary" id="btn-list" type="button">📖 听听讲过的故事</button>
+    </div>
+  </section>
+
+  <!-- 问题 -->
+  <section class="screen" id="screen-question">
+    <div class="topbar">
+      <button class="back" id="btn-q-home" type="button">‹ 首页</button>
+      <span class="tag" id="q-stage"></span>
+    </div>
+    <div class="grow center">
+      <p class="hint">请听问题：</p>
+      <p class="question" id="q-text"></p>
+      <p class="answered-note" id="q-answered" hidden>✔ 这个问题讲过了，可以再讲一次</p>
+    </div>
+    <div class="stack">
+      <button class="btn secondary" id="btn-replay" type="button">🔊 再听一遍问题</button>
+      <button class="btn primary" id="btn-record" type="button">🎙️ 按这里，开始讲</button>
+      <button class="btn text" id="btn-skip" type="button">换一个问题 ›</button>
+    </div>
+  </section>
+
+  <!-- 录音中 -->
+  <section class="screen" id="screen-recording">
+    <p class="hint center-text">正在听您讲，慢慢说，不着急</p>
+    <p class="question small center-text" id="rec-question"></p>
+    <div class="rec-circle">🎙️</div>
+    <div class="timer" id="rec-timer">00:00</div>
+    <div class="transcript empty" id="rec-transcript">（您说的话会一句一句显示在这里）</div>
+    <div class="stack">
+      <button class="btn green" id="btn-stop" type="button">✅ 讲完了</button>
+      <button class="btn text" id="btn-cancel-rec" type="button">这段不要了</button>
+    </div>
+  </section>
+
+  <!-- 录完了：听一听、保存 -->
+  <section class="screen" id="screen-review">
+    <div class="topbar"><span class="tag" id="rv-stage"></span></div>
+    <h2 class="title">录好了！<span class="muted" id="rv-duration"></span></h2>
+    <p class="question small" id="rv-question"></p>
+    <button class="btn secondary" id="btn-play" type="button">▶️ 听一听</button>
+    <div class="transcript" id="rv-transcript"></div>
+    <div class="stack">
+      <button class="btn green" id="btn-save" type="button">💾 保存这段故事</button>
+      <button class="btn text" id="btn-redo" type="button">重新讲一遍</button>
+    </div>
+  </section>
+
+  <!-- 保存成功 -->
+  <section class="screen" id="screen-saved">
+    <div class="grow center">
+      <div class="big-check">✅</div>
+      <h1 class="greeting">保存好了</h1>
+      <p class="sub">谢谢您，<span class="name">奶奶</span> ❤️</p>
+    </div>
+    <div class="stack">
+      <button class="btn primary" id="btn-next" type="button">➡️ 下一个问题</button>
+      <button class="btn secondary" id="btn-home-2" type="button">🏠 今天先到这里</button>
+    </div>
+  </section>
+
+  <!-- 讲过的故事 -->
+  <section class="screen" id="screen-list">
+    <div class="topbar"><button class="back" id="btn-list-back" type="button">‹ 首页</button></div>
+    <h2 class="title">讲过的故事</h2>
+    <div class="stack" id="story-list"></div>
+    <p class="empty-note" id="list-empty" hidden>还没有讲过故事，回到首页开始吧</p>
+  </section>
+
+  <!-- 一个故事 -->
+  <section class="screen" id="screen-detail">
+    <div class="topbar">
+      <button class="back" id="btn-detail-back" type="button">‹ 返回</button>
+      <span class="tag" id="dt-stage"></span>
+    </div>
+    <p class="question small" id="dt-question"></p>
+    <p class="meta" id="dt-meta"></p>
+    <button class="btn secondary" id="btn-detail-play" type="button">▶️ 听一听</button>
+    <div class="transcript" id="dt-transcript"></div>
+  </section>
+
+  <!-- 大字弹窗 -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-box">
+      <h2 id="modal-title"></h2>
+      <p id="modal-text"></p>
+      <button class="btn primary" id="modal-ok" type="button">知道了</button>
+      <button class="btn secondary" id="modal-cancel" type="button" hidden></button>
+    </div>
+  </div>
+
+  <audio id="prompt-audio" preload="auto"></audio>
+  <audio id="playback-audio"></audio>
+
+  <script src="questions.js"></script>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
