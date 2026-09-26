@@ -113,11 +113,19 @@
   function saveUser(u) { try { localStorage.setItem('user', JSON.stringify(u)); } catch (_) {} }
   function localUsers() { try { return JSON.parse(localStorage.getItem('users') || '[]'); } catch (_) { return []; } }
   function rememberLocalUser(u) { const list = localUsers().filter((x) => x.id !== u.id); list.unshift(u); try { localStorage.setItem('users', JSON.stringify(list)); } catch (_) {} }
+  let badTokenShown = false;
+  function badToken() {
+    report('bad-token', 'server rejected the link token');
+    if (badTokenShown) return;
+    badTokenShown = true;
+    showMessage('这个链接已经过期', '口令换过了，请用家人发的新链接重新打开一次');
+  }
   async function fetchUsers() {
     if (!CONFIG.serverUrl) return localUsers();
     try {
       const r = await fetchT(serverBase() + '/api/users', { headers: authHeaders() }, 15000);
       if (r.ok) return await r.json();
+      if (r.status === 401) { badToken(); return []; }
     } catch (_) {}
     return localUsers();
   }
@@ -154,6 +162,7 @@
       try {
         const { ok, status, j } = await postJson('/api/users', pw ? { name, password: pw } : { name });
         if (ok) { saveUserToken(j.id, j.utoken); return { id: j.id, name: j.name, hasPassword: !!j.hasPassword }; }
+        if (status === 401) { badToken(); return null; }
         if (status === 409) {                          // 同名的人设了密码：输密码就当作登录
           pw = await askPassword('enter', name, hint || '这个名字已经有人用了，请输密码');
           if (pw === null) return null;
@@ -588,6 +597,7 @@
       const mb = audio ? audio.size / 1048576 : 0;
       const r = await fetchT(serverBase() + '/api/stories', { method: 'POST', body: fd, headers: authHeaders() }, 30000 + 30000 * mb);
       if (r.status === 403) { needLogin(); return false; }
+      if (r.status === 401) { badToken(); return false; }
       if (!r.ok) report('upload-failed', 'HTTP ' + r.status);
       return r.ok;
     } catch (e) { report('upload-failed', errStr(e)); return false; }
