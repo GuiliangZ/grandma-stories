@@ -166,6 +166,12 @@ python3 server/manage.py backup             # 立刻备份到 iCloud Drive
 问题、追问和按键提示现在用阿里云 Qwen-TTS 的四川话女声「Sunny」生成（`python3 make_question_audio.py`，默认 `qwen:Sunny`）。
 想换回普通话：`python3 make_question_audio.py Tingting`。
 
+## 自己提问题（我想讲的）
+
+首页「✍️ 我想讲的」：写一个题目（比如「我养过的那条狗」）就变成她自己的一个问题，立刻进入讲述；
+问题存在 Mac 上 `stories/<用户名>/questions.json`，语音由 Mac 用同一个四川话声音生成到 `qaudio/`。
+自己加的问题在她的问题库里排在前面，和内置问题一样有追问、能删（问题页底部「删掉这个问题」，已讲的录音保留）。
+
 ## 改问题、改称呼、改按键语音
 
 - 问题：编辑 `web/questions.js`（保持 JSON 格式）

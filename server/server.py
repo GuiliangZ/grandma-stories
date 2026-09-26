@@ -28,6 +28,7 @@ import secrets
 import audio_tools
 import notify
 import transcribe
+import tts
 
 ROOT = pathlib.Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "config.json"
@@ -157,6 +158,25 @@ def user_name(uid, fallback=""):
 
 def user_dir(uid, fallback_name=""):
     return STORIES / fs_name(user_name(uid, fallback_name), 20)
+
+
+def user_questions_path(uid):
+    return user_dir(uid) / "questions.json"
+
+
+def load_user_questions(uid):
+    try:
+        return json.loads(user_questions_path(uid).read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def save_user_questions(uid, qs):
+    p = user_questions_path(uid)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(qs, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(p)
 
 
 def story_dirname(meta):
@@ -409,6 +429,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(401, {"error": "bad token"})
             if path == "/api/users":
                 return self._json(200, [public_user(u) for u in load_users()])
+            m = re.match(r"^/api/users/([A-Za-z0-9_-]+)/questions$", path)
+            if m:                                       # 这个人自己加的问题
+                if not self._user_ok(m.group(1)):
+                    return self._json(403, {"error": "need password"})
+                return self._json(200, load_user_questions(m.group(1)))
+            m = re.match(r"^/api/users/([A-Za-z0-9_-]+)/questions/([A-Za-z0-9_-]+)/audio$", path)
+            if m:
+                if not self._user_ok(m.group(1)):
+                    return self._json(403, {"error": "need password"})
+                return self.send_file(user_dir(m.group(1)) / "qaudio" / f"{safe(m.group(2))}.m4a")
             if path == "/api/stories":
                 want = parse_qs(urlparse(self.path).query).get("user", [""])[0]
                 if not want and not self._is_family():
@@ -560,6 +590,27 @@ class Handler(BaseHTTPRequestHandler):
                 save_users(users)
             log("新建用户", u["id"], name)
             return self._json(201, dict(public_user(u), utoken=make_user_token(u["id"])))
+        m = re.match(r"^/api/users/([A-Za-z0-9_-]+)/questions$", path)
+        if m:                                           # 用户自己提一个想讲的题目 → 变成问题 + 生成语音
+            uid = m.group(1)
+            if not self._authed() or not self._user_ok(uid):
+                return self._json(403, {"error": "need password"})
+            body = read_json()
+            text = " ".join(str(body.get("text") or "").split())[:60]
+            if len(text) < 2:
+                return self._json(400, {"error": "text too short"})
+            qid = "c" + hashlib.sha1(f"{uid}|{text}|{time.time()}".encode("utf-8")).hexdigest()[:8]
+            q = {"id": qid, "stage": "自己想讲的", "text": text, "createdAt": int(time.time() * 1000),
+                 "followups": ["那后来呢？", "还有什么想说的吗？"]}
+            with LOCK:
+                qs = load_user_questions(uid)
+                qs.append(q)
+                save_user_questions(uid, qs)
+            log("新问题", uid, text)
+            self._json(201, q)
+            # 语音在后台生成，几秒钟；生成前手机会用自带朗读兜底
+            threading.Thread(target=tts.synth, args=(text, user_dir(uid) / "qaudio" / f"{qid}.m4a"), daemon=True).start()
+            return
         if path == "/api/users/login":                 # 选人后输密码 → 换令牌
             if not self._authed():
                 return self._json(401, {"error": "bad token"})
@@ -658,6 +709,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         path = urlparse(self.path).path
+        mq = re.match(r"^/api/users/([A-Za-z0-9_-]+)/questions/([A-Za-z0-9_-]+)$", path)
+        if mq:
+            uid, qid = mq.group(1), mq.group(2)
+            if not self._authed() or not self._user_ok(uid):
+                return self._json(403, {"error": "need password"})
+            with LOCK:
+                qs = [q for q in load_user_questions(uid) if q.get("id") != qid]
+                save_user_questions(uid, qs)
+            try: (user_dir(uid) / "qaudio" / f"{safe(qid)}.m4a").unlink()
+            except Exception: pass
+            return self._json(200, {"ok": True})
         m = re.match(r"^/api/stories/([A-Za-z0-9_-]+)$", path)
         if not m:
             return self._json(404, {"error": "not found"})

@@ -39,5 +39,10 @@ window.UI_PHRASES = {
   "wrong_password": "密码不对，再试一次",
   "continue_last": "好，接着讲上次的问题",
   "password_done": "设好了，以后进来要输密码",
-  "password_removed": "密码已经取消"
+  "password_removed": "密码已经取消",
+  "my_topic":     "您想讲什么？说个题目",
+  "topic_added":  "好，这个问题加进去了，现在就可以讲",
+  "delete_question": "要删掉这个问题吗",
+  "fu_generic1":  "那后来呢？",
+  "fu_generic2":  "还有什么想说的吗？"
 };

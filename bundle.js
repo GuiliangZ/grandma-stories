@@ -1,4 +1,4 @@
-/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=92177ea16b */
+/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=087e11fbfe */
 /* ===== config.js ===== */
 // ====== 这里是可以改的设置 ======
 window.APP_CONFIG = {
@@ -113,7 +113,12 @@ window.UI_PHRASES = {
   "wrong_password": "密码不对，再试一次",
   "continue_last": "好，接着讲上次的问题",
   "password_done": "设好了，以后进来要输密码",
-  "password_removed": "密码已经取消"
+  "password_removed": "密码已经取消",
+  "my_topic":     "您想讲什么？说个题目",
+  "topic_added":  "好，这个问题加进去了，现在就可以讲",
+  "delete_question": "要删掉这个问题吗",
+  "fu_generic1":  "那后来呢？",
+  "fu_generic2":  "还有什么想说的吗？"
 };
 
 /* ===== storage.js ===== */
@@ -270,7 +275,7 @@ window.Speaker = (() => {
       return p;
     },
     // 读问题：默认排在按键反馈后面
-    question(q, opts = {}) { return enqueue({ src: cfg.questionDir + q.id + '.m4a', text: q.text }, opts.clear === true); },
+    question(q, opts = {}) { return enqueue({ src: q.audioUrl || (q.uiKey ? cfg.uiDir + q.uiKey + '.m4a' : cfg.questionDir + q.id + '.m4a'), text: q.text }, opts.clear === true); },
     stop,
     idle() { return playing ? new Promise((r) => idleResolvers.push(r)) : Promise.resolve(true); },
     // 等某次播报，但最多等 ms 毫秒
@@ -430,6 +435,7 @@ window.WavRecorder = (() => {
 
   const state = {
     user: null,                                  // {id, name}：当前是谁在用
+    customQuestions: [],                         // 这个人自己加的问题（存在 Mac 上）
     stories: [], current: null, currentFollowup: '', followupIndex: 0, detailId: null,
     blob: null, seconds: 0, timer: null, recording: false, paused: false,
     recognition: null, transcript: '', sessionFinal: '', interim: '',
@@ -469,7 +475,63 @@ window.WavRecorder = (() => {
     const d = new Date(ts);
     return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
   };
-  const questionById = (id) => (window.QUESTIONS || []).find((q) => q.id === id);
+  const allQuestions = () => state.customQuestions.concat(window.QUESTIONS || []);
+  const questionById = (id) => allQuestions().find((q) => q.id === id);
+  const isCustom = (q) => !!(q && q.custom);
+  function customAudioUrl(qid) { return serverBase() + '/api/users/' + encodeURIComponent(state.user.id) + '/questions/' + encodeURIComponent(qid) + '/audio' + audioQuery(); }
+  function decorateCustom(q) {
+    return Object.assign({}, q, { custom: true, stage: q.stage || '自己想讲的', audioUrl: customAudioUrl(q.id),
+      followups: q.followups && q.followups.length ? q.followups : ['那后来呢？', '还有什么想说的吗？'] });
+  }
+  function localCustomKey() { return 'customq:' + (state.user ? state.user.id : ''); }
+  async function loadCustomQuestions() {
+    if (!state.user) { state.customQuestions = []; return; }
+    let list = null;
+    if (CONFIG.serverUrl) {
+      try {
+        const r = await fetchT(serverBase() + '/api/users/' + encodeURIComponent(state.user.id) + '/questions', { headers: authHeaders() }, 15000);
+        if (r.ok) { list = await r.json(); try { localStorage.setItem(localCustomKey(), JSON.stringify(list)); } catch (_) {} }
+        else if (r.status === 403) { needLogin(); return; }
+      } catch (_) {}
+    }
+    if (!list) { try { list = JSON.parse(localStorage.getItem(localCustomKey()) || '[]'); } catch (_) { list = []; } }
+    state.customQuestions = list.map(decorateCustom);
+  }
+  async function addTopic() {
+    const input = $('#topic-input');
+    const text = (input.value || '').trim().replace(/\s+/g, ' ');
+    const err = $('#topic-error');
+    if (text.length < 2) { err.textContent = '再多写两个字'; input.focus(); return; }
+    err.textContent = '';
+    const btn = $('#btn-topic-ok'); btn.disabled = true;
+    let q = null;
+    if (CONFIG.serverUrl) {
+      try {
+        const { ok, status, j } = await postJson('/api/users/' + encodeURIComponent(state.user.id) + '/questions', { text });
+        if (ok) q = j;
+        else if (status === 403) { btn.disabled = false; needLogin(); return; }
+        else err.textContent = '电脑那边出错了，再试一次';
+      } catch (_) { err.textContent = '连不上电脑，再试一次'; }
+    } else {
+      q = { id: 'c' + Date.now().toString(36), stage: '自己想讲的', text, createdAt: Date.now() };
+      try { const l = JSON.parse(localStorage.getItem(localCustomKey()) || '[]'); l.push(q); localStorage.setItem(localCustomKey(), JSON.stringify(l)); } catch (_) {}
+    }
+    btn.disabled = false;
+    if (!q) return;
+    input.value = '';
+    const dq = decorateCustom(q);
+    state.customQuestions.unshift(dq);
+    Speaker.say('topic_added', { clear: false });
+    setTimeout(() => openQuestion(dq), 1500);          // 语音在电脑上生成要几秒，给它一点时间
+  }
+  async function deleteQuestion(q) {
+    const yes = await ask('删掉这个问题？', '已经讲过的录音会保留', '删掉', '不删', 'deleted', 'keep');
+    if (!yes) return;
+    state.customQuestions = state.customQuestions.filter((x) => x.id !== q.id);
+    try { localStorage.setItem(localCustomKey(), JSON.stringify(state.customQuestions.map(({ custom, audioUrl, ...r }) => r))); } catch (_) {}
+    if (CONFIG.serverUrl) { try { await fetchT(serverBase() + '/api/users/' + encodeURIComponent(state.user.id) + '/questions/' + encodeURIComponent(q.id), { method: 'DELETE', headers: authHeaders() }, 15000); } catch (_) {} }
+    openQuestion(nextQuestion(null));
+  }
 
   // ====== 每个按键的语音反馈：带 data-say 的按钮，点下去先读一句 ======
   let audioUnlocked = false;
@@ -609,6 +671,7 @@ window.WavRecorder = (() => {
     $$('.name').forEach((el) => { el.textContent = u.name; });
     $('#home-user').textContent = '现在是：' + u.name;
     try { state.stories = await StoryStore.all(u.id); } catch (e) { state.stories = []; report('idb-open-failed', errStr(e)); }
+    await loadCustomQuestions();
     renderHome();
     show('home');
     refreshFromServer().then(() => renderHome());
@@ -634,7 +697,7 @@ window.WavRecorder = (() => {
   function skippedSet() { try { return new Set(JSON.parse(localStorage.getItem('skipped:' + (state.user ? state.user.id : '')) || '[]')); } catch (_) { return new Set(); } }
   function markSkipped(id) { const s = skippedSet(); s.add(id); try { localStorage.setItem('skipped:' + (state.user ? state.user.id : ''), JSON.stringify([...s])); } catch (_) {} }
   function nextQuestion(after) {
-    const list = window.QUESTIONS;
+    const list = allQuestions();
     const done = new Set(state.stories.map((s) => s.questionId));
     const skipped = skippedSet();
     const start = after ? (list.findIndex((q) => q.id === after.id) + 1) % list.length : 0;
@@ -650,9 +713,10 @@ window.WavRecorder = (() => {
     state.continued = false;
     $('#btn-record').textContent = '🎙️ 按这里，开始讲';
     const done = state.stories.filter((s) => s.questionId === q.id).length;
-    const total = window.QUESTIONS.length;
+    const total = allQuestions().length;
     const answered = new Set(state.stories.map((s) => s.questionId)).size;
-    $('#q-stage').textContent = '关于' + q.stage;
+    $('#q-stage').textContent = isCustom(q) ? '自己想讲的' : '关于' + q.stage;
+    $('#btn-delete-question').hidden = !isCustom(q);
     $('#q-progress').textContent = answered ? `已经讲了 ${answered} 个，还有 ${total - answered} 个没讲` : '请听问题：';
     $('#q-text').textContent = q.text;
     $('#q-answered').hidden = !done;
@@ -927,7 +991,7 @@ window.WavRecorder = (() => {
     $('#btn-home-2').textContent = enough ? '🏠 今天讲得够多了，歇一歇' : '🏠 今天先到这里';
     $('#btn-home-2').dataset.say = enough ? 'enough' : 'bye';
     if (story.interrupted) Speaker.say('interrupted', { clear: false });
-    if (fu) { Speaker.say('well_done', { clear: false }); Speaker.question({ id: q.id + '-f' + (idx + 1), text: fu }); }
+    if (fu) { Speaker.say('well_done', { clear: false }); Speaker.question(isCustom(q) ? { id: 'x', uiKey: 'fu_generic' + (idx + 1), text: fu } : { id: q.id + '-f' + (idx + 1), text: fu }); }
     else if (enough) Speaker.say('enough', { clear: false });
     state.pendingFollowup = fu;
   }
@@ -950,12 +1014,13 @@ window.WavRecorder = (() => {
     state.continued = !fu;
     const n = state.stories.filter((s) => s.questionId === q.id).length;
     $('#q-stage').textContent = '接着讲';
+    $('#btn-delete-question').hidden = true;
     $('#q-progress').textContent = n ? `这个问题已经讲了 ${n} 段，接着讲：` : '请听问题：';
     $('#q-text').textContent = fu || q.text;
     $('#q-answered').hidden = true;
     $('#btn-record').textContent = '🎙️ 按这里，接着讲';
     show('question');
-    Speaker.question(fu ? { id: q.id + '-f' + (idx + 1), text: fu } : q);
+    Speaker.question(fu ? (isCustom(q) ? { id: 'x', uiKey: 'fu_generic' + (idx + 1), text: fu } : { id: q.id + '-f' + (idx + 1), text: fu }) : q);
   }
   function lastQuestion() { const s = state.stories[0]; return s ? questionById(s.questionId) : null; }
 
@@ -1181,6 +1246,11 @@ window.WavRecorder = (() => {
     $('#btn-start').onclick = () => openQuestion(nextQuestion(null));
     $('#btn-continue-last').onclick = () => continueQuestion(lastQuestion());
     $('#btn-set-password').onclick = setPasswordFlow;
+    $('#btn-my-topic').onclick = () => { $('#topic-error').textContent = ''; show('topic'); setTimeout(() => $('#topic-input').focus(), 300); };
+    $('#btn-topic-back').onclick = () => { renderHome(); show('home'); };
+    $('#btn-topic-ok').onclick = addTopic;
+    $('#topic-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addTopic(); } });
+    $('#btn-delete-question').onclick = () => { if (isCustom(state.current)) deleteQuestion(state.current); };
     $('#btn-detail-continue').onclick = () => { const s = state.stories.find((x) => x.id === state.detailId); stopPlayback(); continueQuestion(s && questionById(s.questionId)); };
     $('#btn-switch-user').onclick = showUserScreen;
     $('#btn-user-new').onclick = () => { $('#user-name-error').textContent = ''; show('user-new'); setTimeout(() => $('#user-name-input').focus(), 300); };

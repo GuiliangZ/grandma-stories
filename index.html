@@ -66,7 +66,22 @@
       <button class="btn primary" id="btn-start" type="button" data-say="start">🎙️ 开始讲故事</button>
       <button class="btn secondary" id="btn-continue-last" type="button" data-say="continue_last" hidden>🔁 接着讲上次的问题</button>
       <button class="btn secondary" id="btn-list" type="button" data-say="list">📖 听听讲过的故事</button>
+      <button class="btn secondary" id="btn-my-topic" type="button" data-say="my_topic">✍️ 我想讲的</button>
       <button class="btn text" id="btn-set-password" type="button" data-say="set_password">🔒 设置密码</button>
+    </div>
+  </section>
+
+  <!-- 我想讲的：自己提一个题目，变成一个问题 -->
+  <section class="screen" id="screen-topic">
+    <div class="topbar"><button class="back" id="btn-topic-back" type="button" data-say="back">‹ 返回</button></div>
+    <div class="grow center">
+      <h1 class="greeting">您想讲什么？</h1>
+      <p class="sub">写个题目就行，比如：我养过的那条狗</p>
+      <input class="bigfield" id="topic-input" type="text" maxlength="60" placeholder="我想讲……" autocomplete="off">
+      <p class="status" id="topic-error"></p>
+    </div>
+    <div class="stack">
+      <button class="btn green" id="btn-topic-ok" type="button" data-say="ok">✅ 好了，就讲这个</button>
     </div>
   </section>
 
@@ -85,6 +100,7 @@
       <button class="btn secondary" id="btn-replay" type="button" data-say="replay">🔊 再听一遍问题</button>
       <button class="btn primary" id="btn-record" type="button" data-say="record">🎙️ 按这里，开始讲</button>
       <button class="btn text" id="btn-skip" type="button" data-say="skip">换一个问题 ›</button>
+      <button class="btn text danger" id="btn-delete-question" type="button" data-say="delete_question" hidden>🗑️ 删掉这个问题</button>
     </div>
   </section>
 
@@ -152,7 +168,7 @@
 
   <audio id="prompt-audio" preload="auto"></audio>
   <audio id="playback-audio"></audio>
-  <script src="bundle.js?v=92177ea16b"></script>
+  <script src="bundle.js?v=087e11fbfe"></script>
   <!-- 保险：脚本没加载好（比如微信缓存了坏文件）时，给个能看懂的提示而不是一个按不动的页面 -->
   <script>
   window.addEventListener('load', function () {

@@ -75,7 +75,7 @@ window.Speaker = (() => {
       return p;
     },
     // 读问题：默认排在按键反馈后面
-    question(q, opts = {}) { return enqueue({ src: cfg.questionDir + q.id + '.m4a', text: q.text }, opts.clear === true); },
+    question(q, opts = {}) { return enqueue({ src: q.audioUrl || (q.uiKey ? cfg.uiDir + q.uiKey + '.m4a' : cfg.questionDir + q.id + '.m4a'), text: q.text }, opts.clear === true); },
     stop,
     idle() { return playing ? new Promise((r) => idleResolvers.push(r)) : Promise.resolve(true); },
     // 等某次播报，但最多等 ms 毫秒
