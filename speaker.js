@@ -13,6 +13,7 @@ window.Speaker = (() => {
   loadVoices();
   if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = loadVoices;
 
+  // 返回 true=放完 / 'missing'=文件不存在 / 'blocked'=浏览器不让放 / 'cancelled'
   function playFile(src) {
     return new Promise((resolve) => {
       let done = false;
@@ -20,10 +21,10 @@ window.Speaker = (() => {
       cancelCurrent = () => { el.pause(); finish('cancelled'); };
       el.onended = () => finish(true);
       el.onpause = () => finish(true);     // iPhone 打开麦克风时可能把它暂停掉，当作放完
-      el.onerror = () => finish(false);
+      el.onerror = () => finish('missing');
       el.src = src;
       const p = el.play();
-      if (p && p.catch) p.catch(() => finish(false));
+      if (p && p.catch) p.catch(() => finish('blocked'));
     });
   }
   function tts(text) {
@@ -49,8 +50,9 @@ window.Speaker = (() => {
     playing = true;
     while (queue.length) {
       const item = queue.shift();
-      let r = item.src ? await playFile(item.src) : false;
-      if (r === false && item.text) r = await tts(item.text);
+      let r = item.src ? await playFile(item.src) : 'missing';
+      // 整套系统只用一种声音：只有语音文件确实不存在时才退到手机自带朗读；被浏览器拦住就保持安静
+      if (r === 'missing' && item.text) r = await tts(item.text);
       item.done(r !== 'cancelled');
     }
     playing = false;
