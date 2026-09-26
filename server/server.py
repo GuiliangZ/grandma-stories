@@ -381,10 +381,15 @@ class Handler(BaseHTTPRequestHandler):
         return bool(fam) and given == fam
 
     def _user_ok(self, uid):
-        """能不能碰 uid 这个人的故事：家人口令可以，或者带着这个人的令牌。"""
+        """能不能碰 uid 这个人的故事：家人口令可以；这个人没设密码也可以；设了密码就要带着这个人的令牌。"""
         if self._is_family():
             return True
-        return bool(uid) and user_from_token(self._user_token()) == uid
+        if not uid:
+            return False
+        u = next((x for x in load_users() if x["id"] == uid), None)
+        if u is None or not u.get("pw"):
+            return True
+        return user_from_token(self._user_token()) == uid
 
     def do_OPTIONS(self):
         self.send_response(204); self._cors(); self.end_headers()
@@ -539,18 +544,18 @@ class Handler(BaseHTTPRequestHandler):
             pw = str(body.get("password") or "")
             if not name:
                 return self._json(400, {"error": "name required"})
-            if len(pw) < 4:
+            if pw and len(pw) < 4:
                 return self._json(400, {"error": "password too short"})
             with LOCK:
                 users = load_users()
                 for u in users:
-                    if u["name"] == name:
-                        if not u.get("pw"):
-                            u["pw"] = hash_password(pw); save_users(users)
-                        elif not check_password(u, pw):
-                            return self._json(409, {"error": "name taken", "message": "这个名字已经有人用了，密码不对"})
+                    if u["name"] == name:                      # 同名：没密码直接进；有密码要对
+                        if u.get("pw") and not check_password(u, pw):
+                            return self._json(409, {"error": "name taken", "message": "这个名字已经有人用了，要输密码"})
                         return self._json(200, dict(public_user(u), utoken=make_user_token(u["id"])))
-                u = {"id": "u" + secrets.token_hex(4), "name": name, "createdAt": time.strftime("%Y-%m-%d %H:%M:%S"), "pw": hash_password(pw)}
+                u = {"id": "u" + secrets.token_hex(4), "name": name, "createdAt": time.strftime("%Y-%m-%d %H:%M:%S")}
+                if pw:
+                    u["pw"] = hash_password(pw)
                 users.append(u)
                 save_users(users)
             log("新建用户", u["id"], name)
@@ -564,7 +569,7 @@ class Handler(BaseHTTPRequestHandler):
             if not u:
                 return self._json(404, {"error": "no such user"})
             if not u.get("pw"):
-                return self._json(409, {"error": "no password", "needPassword": True})
+                return self._json(200, dict(public_user(u), utoken=make_user_token(uid)))
             if not check_password(u, pw):
                 time.sleep(1.0)                        # 挡一下乱试
                 return self._json(403, {"error": "wrong password"})
@@ -575,17 +580,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(401, {"error": "bad token"})
             body = read_json()
             pw = str(body.get("password") or "")
-            if len(pw) < 4:
+            if pw and len(pw) < 4:
                 return self._json(400, {"error": "password too short"})
             with LOCK:
                 users = load_users()
                 u = next((x for x in users if x["id"] == m.group(1)), None)
                 if not u:
                     return self._json(404, {"error": "no such user"})
-                if u.get("pw") and not self._is_family():
-                    return self._json(403, {"error": "already has password"})
-                u["pw"] = hash_password(pw); save_users(users)
-            log("设置密码", u["id"], u["name"])
+                if u.get("pw") and not self._user_ok(u["id"]):
+                    return self._json(403, {"error": "need password"})
+                if pw:
+                    u["pw"] = hash_password(pw)
+                else:
+                    u.pop("pw", None)
+                save_users(users)
+            log("设置密码" if pw else "取消密码", u["id"], u["name"])
             return self._json(200, dict(public_user(u), utoken=make_user_token(u["id"])))
         if path != "/api/stories":
             return self._json(404, {"error": "not found"})

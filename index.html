@@ -66,6 +66,7 @@
       <button class="btn primary" id="btn-start" type="button" data-say="start">🎙️ 开始讲故事</button>
       <button class="btn secondary" id="btn-continue-last" type="button" data-say="continue_last" hidden>🔁 接着讲上次的问题</button>
       <button class="btn secondary" id="btn-list" type="button" data-say="list">📖 听听讲过的故事</button>
+      <button class="btn text" id="btn-set-password" type="button" data-say="set_password">🔒 设置密码</button>
     </div>
   </section>
 
@@ -151,7 +152,7 @@
 
   <audio id="prompt-audio" preload="auto"></audio>
   <audio id="playback-audio"></audio>
-  <script src="bundle.js?v=cf22240afc"></script>
+  <script src="bundle.js?v=b2ced47ba4"></script>
   <!-- 保险：脚本没加载好（比如微信缓存了坏文件）时，给个能看懂的提示而不是一个按不动的页面 -->
   <script>
   window.addEventListener('load', function () {

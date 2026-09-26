@@ -37,5 +37,7 @@ window.UI_PHRASES = {
   "password":     "请输入密码",
   "set_password": "请设一个密码，记好了",
   "wrong_password": "密码不对，再试一次",
-  "continue_last": "好，接着讲上次的问题"
+  "continue_last": "好，接着讲上次的问题",
+  "password_done": "设好了，以后进来要输密码",
+  "password_removed": "密码已经取消"
 };

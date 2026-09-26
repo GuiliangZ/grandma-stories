@@ -1,4 +1,4 @@
-/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=cf22240afc */
+/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=b2ced47ba4 */
 /* ===== config.js ===== */
 // ====== 这里是可以改的设置 ======
 window.APP_CONFIG = {
@@ -111,7 +111,9 @@ window.UI_PHRASES = {
   "password":     "请输入密码",
   "set_password": "请设一个密码，记好了",
   "wrong_password": "密码不对，再试一次",
-  "continue_last": "好，接着讲上次的问题"
+  "continue_last": "好，接着讲上次的问题",
+  "password_done": "设好了，以后进来要输密码",
+  "password_removed": "密码已经取消"
 };
 
 /* ===== storage.js ===== */
@@ -495,12 +497,12 @@ window.WavRecorder = (() => {
   function askPassword(mode, name, hint) {
     return new Promise((resolve) => {
       $('#password-title').textContent = mode === 'set' ? '请给「' + name + '」设一个密码' : '请输入「' + name + '」的密码';
-      $('#password-sub').textContent = mode === 'set' ? '至少 4 位，数字最好记；以后进这个人的故事都要输它' : '';
+      $('#password-sub').textContent = mode === 'set' ? '至少 4 位，数字最好记；设了以后进这个人的故事都要输它' : '';
       $('#password-error').textContent = hint || '';
       const input = $('#password-input'); input.value = '';
       const ok = $('#btn-password-ok'), back = $('#btn-password-back');
       const finish = (v) => { ok.onclick = back.onclick = null; input.onkeydown = null; resolve(v); };
-      ok.onclick = () => { const v = input.value.trim(); if (v.length < 4) { $('#password-error').textContent = '密码至少 4 位'; return; } finish(v); };
+      ok.onclick = () => { const v = input.value.trim(); if (v.length && v.length < 4) { $('#password-error').textContent = '密码至少 4 位'; return; } if (!v.length && !(mode === 'set' && state.user && state.user.hasPassword)) { $('#password-error').textContent = '请输入密码（至少 4 位）'; return; } finish(v); };
       back.onclick = () => finish(null);
       input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); ok.onclick(); } };
       Speaker.say(mode === 'set' ? 'set_password' : 'password', { clear: false });
@@ -519,17 +521,19 @@ window.WavRecorder = (() => {
       let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
       return { id: 'u' + h.toString(16), name };
     }
-    let hint = '';
+    let hint = '', pw = '';
     while (true) {
-      const pw = await askPassword('set', name, hint);
-      if (pw === null) return null;
       try {
-        const { ok, status, j } = await postJson('/api/users', { name, password: pw });
-        if (ok) { saveUserToken(j.id, j.utoken); return { id: j.id, name: j.name }; }
-        if (status === 409) { hint = '这个名字已经有人用了，密码不对'; continue; }
+        const { ok, status, j } = await postJson('/api/users', pw ? { name, password: pw } : { name });
+        if (ok) { saveUserToken(j.id, j.utoken); return { id: j.id, name: j.name, hasPassword: !!j.hasPassword }; }
+        if (status === 409) {                          // 同名的人设了密码：输密码就当作登录
+          pw = await askPassword('enter', name, hint || '这个名字已经有人用了，请输密码');
+          if (pw === null) return null;
+          hint = '密码不对，再试一次'; continue;
+        }
         report('create-user-failed', 'HTTP ' + status);
-        hint = '电脑那边出错了，再试一次';
-      } catch (e) { report('create-user-failed', errStr(e)); hint = '连不上电脑，再试一次'; }
+        $('#user-name-error').textContent = '电脑那边出错了，再试一次'; return null;
+      } catch (e) { report('create-user-failed', errStr(e)); $('#user-name-error').textContent = '连不上电脑，再试一次'; return null; }
     }
   }
   // 选人：先看有没有这个人的令牌；没有就输密码（老用户没密码 → 先设一个）
@@ -537,19 +541,36 @@ window.WavRecorder = (() => {
     if (!CONFIG.serverUrl) return true;
     let hint = '';
     while (true) {
-      const mode = u.hasPassword === false ? 'set' : 'enter';
-      const pw = await askPassword(mode, u.name, hint);
-      if (pw === null) return false;
+      let pw = '';
+      if (u.hasPassword) {                             // 设了密码的人才问；没设的直接进
+        pw = await askPassword('enter', u.name, hint);
+        if (pw === null) return false;
+      }
       try {
-        const { ok, status, j } = mode === 'set'
-          ? await postJson('/api/users/' + encodeURIComponent(u.id) + '/password', { password: pw })
-          : await postJson('/api/users/login', { id: u.id, password: pw });
-        if (ok) { saveUserToken(u.id, j.utoken); return true; }
-        if (status === 409 && j.needPassword) { u.hasPassword = false; continue; }
-        if (status === 403) { Speaker.say('wrong_password'); hint = '密码不对，再试一次'; continue; }
+        const { ok, status, j } = await postJson('/api/users/login', { id: u.id, password: pw });
+        if (ok) { saveUserToken(u.id, j.utoken); u.hasPassword = !!j.hasPassword; return true; }
+        if (status === 403) { u.hasPassword = true; Speaker.say('wrong_password'); hint = pw ? '密码不对，再试一次' : ''; continue; }
         hint = '电脑那边出错了，再试一次';
       } catch (e) { hint = '连不上电脑，再试一次'; }
+      if (!u.hasPassword) return false;
     }
+  }
+  // 首页「设置密码」：设了以后，任何手机进这个人都要输密码；再点一次可以改或取消
+  async function setPasswordFlow() {
+    const u = state.user;
+    if (!u || !CONFIG.serverUrl) { showMessage('现在设不了', '要连上电脑才能设密码'); return; }
+    const pw = await askPassword('set', u.name, u.hasPassword ? '输入新密码；想取消密码就留空直接按「好了」' : '');
+    show('home');
+    if (pw === null) return;
+    try {
+      const { ok, status, j } = await postJson('/api/users/' + encodeURIComponent(u.id) + '/password', { password: pw });
+      if (ok) {
+        saveUserToken(u.id, j.utoken); u.hasPassword = !!j.hasPassword; saveUser(u); renderHome();
+        Speaker.say(u.hasPassword ? 'password_done' : 'password_removed');
+        showMessage(u.hasPassword ? '设好了' : '密码已取消', u.hasPassword ? '以后进「' + u.name + '」的故事都要输这个密码，请记好' : '现在不用密码就能进');
+      } else if (status === 403) { needLogin(); }
+      else showMessage('没设成', '电脑那边出错了，再试一次');
+    } catch (_) { showMessage('没设成', '连不上电脑，再试一次'); }
   }
   async function showUserScreen() {
     Speaker.stop();
@@ -563,7 +584,7 @@ window.WavRecorder = (() => {
       b.className = 'card user'; b.type = 'button'; b.textContent = u.name; b.dataset.say = 'hello';
       b.onclick = async () => {
         state.user = u;                                 // 先指向她，好取令牌
-        if (!userToken()) { if (!(await loginUser(u))) { state.user = null; showUserScreen(); return; } }
+        if (!userToken() || u.hasPassword) { if (!(await loginUser(u))) { state.user = null; showUserScreen(); return; } }
         selectUser(u);
       };
       box.appendChild(b);
@@ -1068,6 +1089,7 @@ window.WavRecorder = (() => {
 
   // ====== 讲过的故事 ======
   function renderHome() {
+    $('#btn-set-password').textContent = state.user && state.user.hasPassword ? '🔒 修改密码' : '🔒 设置密码';
     const lq = lastQuestion();
     const cb = $('#btn-continue-last');
     cb.hidden = !lq;
@@ -1146,6 +1168,7 @@ window.WavRecorder = (() => {
   function bind() {
     $('#btn-start').onclick = () => openQuestion(nextQuestion(null));
     $('#btn-continue-last').onclick = () => continueQuestion(lastQuestion());
+    $('#btn-set-password').onclick = setPasswordFlow;
     $('#btn-detail-continue').onclick = () => { const s = state.stories.find((x) => x.id === state.detailId); stopPlayback(); continueQuestion(s && questionById(s.questionId)); };
     $('#btn-switch-user').onclick = showUserScreen;
     $('#btn-user-new').onclick = () => { $('#user-name-error').textContent = ''; show('user-new'); setTimeout(() => $('#user-name-input').focus(), 300); };

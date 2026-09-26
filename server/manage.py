@@ -7,6 +7,8 @@
     python3 server/manage.py index                     重建每个用户的 目录.md 和 总览.md
     python3 server/manage.py backup                    立刻备份一次到 iCloud Drive
     python3 server/manage.py set-password 名字 新密码   忘了密码时重设（至少 4 位）
+    python3 server/manage.py clear-password 名字        取消这个人的密码
+    python3 server/manage.py clear-passwords            取消所有人的密码
 改完请重启服务（服务启动时会重新扫描）。"""
 import json
 import pathlib
@@ -112,13 +114,24 @@ def cmd_set_password(key, pw):
     print(f"已重设 {u['name']} 的密码")
 
 
+def cmd_clear_password(key=None):
+    users = S.load_users()
+    n = 0
+    for x in users:
+        if key is None or key in (x["id"], x["name"]):
+            if x.pop("pw", None) is not None:
+                n += 1
+    S.save_users(users)
+    print(f"已清除 {n} 个密码")
+
+
 def cmd_index():
     S.load_index(); S.write_indexes(); print("目录已重建：stories/总览.md 和各用户的 目录.md")
 
 
 if __name__ == "__main__":
     a = sys.argv[1:]
-    if not a or a[0] not in ("users", "rename-user", "delete-user", "migrate", "index", "backup", "set-password"):
+    if not a or a[0] not in ("users", "rename-user", "delete-user", "migrate", "index", "backup", "set-password", "clear-password", "clear-passwords"):
         print(__doc__); sys.exit(1)
     {"users": lambda: cmd_users(), "rename-user": lambda: cmd_rename(a[1], a[2]), "delete-user": lambda: cmd_delete(a[1]),
-     "migrate": cmd_migrate, "index": cmd_index, "set-password": lambda: cmd_set_password(a[1], a[2]), "backup": lambda: (S.backup_now(S.ICLOUD_DST if S.ICLOUD_DST.parent.exists() else None), print("备份到", S.ICLOUD_DST if S.ICLOUD_DST.parent.exists() else S.BACKUP_DST))}[a[0]]()
+     "migrate": cmd_migrate, "index": cmd_index, "set-password": lambda: cmd_set_password(a[1], a[2]), "clear-password": lambda: cmd_clear_password(a[1]), "clear-passwords": lambda: cmd_clear_password(None), "backup": lambda: (S.backup_now(S.ICLOUD_DST if S.ICLOUD_DST.parent.exists() else None), print("备份到", S.ICLOUD_DST if S.ICLOUD_DST.parent.exists() else S.BACKUP_DST))}[a[0]]()
