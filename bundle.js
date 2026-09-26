@@ -1,4 +1,4 @@
-/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=fffc591038 */
+/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=980ab266f0 */
 /* ===== config.js ===== */
 // ====== 这里是可以改的设置 ======
 window.APP_CONFIG = {
@@ -393,7 +393,7 @@ window.WavRecorder = (() => {
     CONFIG.serverUrl = location.origin;
   }
   const serverBase = () => CONFIG.serverUrl.replace(/\/$/, '');
-  const userToken = () => { try { return state.user ? (sessionStorage.getItem('utoken:' + state.user.id) || '') : ''; } catch (_) { return ''; } };
+  const userToken = () => { try { return state.user ? (localStorage.getItem('utoken:' + state.user.id) || '') : ''; } catch (_) { return ''; } };
   const authHeaders = () => Object.assign({}, CONFIG.serverToken ? { 'X-Token': CONFIG.serverToken } : {}, userToken() ? { 'X-User-Token': userToken() } : {});
   const audioQuery = () => '?token=' + encodeURIComponent(CONFIG.serverToken || '') + '&ut=' + encodeURIComponent(userToken());
   const IN_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
@@ -512,7 +512,7 @@ window.WavRecorder = (() => {
       setTimeout(() => input.focus(), 300);
     });
   }
-  function saveUserToken(uid, tok) { try { if (tok) sessionStorage.setItem('utoken:' + uid, tok); } catch (_) {} }
+  function saveUserToken(uid, tok) { try { if (tok) localStorage.setItem('utoken:' + uid, tok); } catch (_) {} }
   async function postJson(path, body) {
     const r = await fetchT(serverBase() + path, { method: 'POST', body: JSON.stringify(body), headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()) }, 20000);
     let j = {}; try { j = await r.json(); } catch (_) {}
@@ -1019,7 +1019,7 @@ window.WavRecorder = (() => {
     if (again) syncSoon(again);
   }
   async function needLogin() {
-    try { sessionStorage.removeItem('utoken:' + state.user.id); } catch (_) {}
+    try { localStorage.removeItem('utoken:' + state.user.id); } catch (_) {}
     const u = state.user;
     if (await loginUser(u)) { selectUser(u); } else { state.user = null; showUserScreen(); }
   }
@@ -1209,7 +1209,9 @@ window.WavRecorder = (() => {
       if (!userToken() && CONFIG.serverUrl && !(await loginUser(u))) { state.user = null; showUserScreen(); return; }
       await selectUser(u); return;
     }
-    showUserScreen();                                   // 每次打开都先问「您是哪一位」
+    const u = loadUser();
+    if (u && u.id) { await selectUser(u); }
+    else { showUserScreen(); }
   }
   init();
 })();
