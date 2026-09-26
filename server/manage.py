@@ -6,6 +6,7 @@
     python3 server/manage.py migrate                   把早期结构（用户ID文件夹、英文问题名）改成 用户名/日期_问题
     python3 server/manage.py index                     重建每个用户的 目录.md 和 总览.md
     python3 server/manage.py backup                    立刻备份一次到 iCloud Drive
+    python3 server/manage.py set-password 名字 新密码   忘了密码时重设（至少 4 位）
 改完请重启服务（服务启动时会重新扫描）。"""
 import json
 import pathlib
@@ -22,10 +23,10 @@ def stories_of(udir):
 
 def cmd_users():
     users = S.load_users()
-    print(f"{'ID':12s} {'名字':8s} 录音数  文件夹")
+    print(f"{'ID':12s} {'名字':8s} 录音数  密码  文件夹")
     for u in users:
         d = S.STORIES / S.fs_name(u["name"], 20)
-        print(f"{u['id']:12s} {u['name']:8s} {len(stories_of(d)):5d}   {d.name}/")
+        print(f"{u['id']:12s} {u['name']:8s} {len(stories_of(d)):5d}   {'有' if u.get('pw') else '无'}    {d.name}/")
     extra = S.STORIES / "未分组"
     if extra.exists():
         print(f"{'-':12s} {'未分组':8s} {len(stories_of(extra)):5d}   未分组/（用户功能之前的录音）")
@@ -99,13 +100,25 @@ def cmd_migrate():
     cmd_index()
 
 
+def cmd_set_password(key, pw):
+    if len(pw) < 4:
+        sys.exit("密码至少 4 位")
+    u = find_user(key)
+    users = S.load_users()
+    for x in users:
+        if x["id"] == u["id"]:
+            x["pw"] = S.hash_password(pw)
+    S.save_users(users)
+    print(f"已重设 {u['name']} 的密码")
+
+
 def cmd_index():
     S.load_index(); S.write_indexes(); print("目录已重建：stories/总览.md 和各用户的 目录.md")
 
 
 if __name__ == "__main__":
     a = sys.argv[1:]
-    if not a or a[0] not in ("users", "rename-user", "delete-user", "migrate", "index", "backup"):
+    if not a or a[0] not in ("users", "rename-user", "delete-user", "migrate", "index", "backup", "set-password"):
         print(__doc__); sys.exit(1)
     {"users": lambda: cmd_users(), "rename-user": lambda: cmd_rename(a[1], a[2]), "delete-user": lambda: cmd_delete(a[1]),
-     "migrate": cmd_migrate, "index": cmd_index, "backup": lambda: (S.backup_now(S.ICLOUD_DST if S.ICLOUD_DST.parent.exists() else None), print("备份到", S.ICLOUD_DST if S.ICLOUD_DST.parent.exists() else S.BACKUP_DST))}[a[0]]()
+     "migrate": cmd_migrate, "index": cmd_index, "set-password": lambda: cmd_set_password(a[1], a[2]), "backup": lambda: (S.backup_now(S.ICLOUD_DST if S.ICLOUD_DST.parent.exists() else None), print("备份到", S.ICLOUD_DST if S.ICLOUD_DST.parent.exists() else S.BACKUP_DST))}[a[0]]()

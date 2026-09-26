@@ -36,6 +36,20 @@
     </div>
   </section>
 
+  <!-- 密码：新建名字时设一个；以后选这个人要输对才能进 -->
+  <section class="screen" id="screen-password">
+    <div class="topbar"><button class="back" id="btn-password-back" type="button" data-say="back">‹ 返回</button></div>
+    <div class="grow center">
+      <h1 class="greeting" id="password-title">请输入密码</h1>
+      <p class="sub" id="password-sub"></p>
+      <input class="bigfield" id="password-input" type="text" inputmode="numeric" maxlength="20" placeholder="至少 4 位" autocomplete="off" autocapitalize="off">
+      <p class="status" id="password-error"></p>
+    </div>
+    <div class="stack">
+      <button class="btn green" id="btn-password-ok" type="button" data-say="ok">✅ 好了</button>
+    </div>
+  </section>
+
   <!-- 首页 -->
   <section class="screen active" id="screen-home">
     <div class="topbar">
@@ -50,6 +64,7 @@
     </div>
     <div class="stack">
       <button class="btn primary" id="btn-start" type="button" data-say="start">🎙️ 开始讲故事</button>
+      <button class="btn secondary" id="btn-continue-last" type="button" data-say="continue_last" hidden>🔁 接着讲上次的问题</button>
       <button class="btn secondary" id="btn-list" type="button" data-say="list">📖 听听讲过的故事</button>
     </div>
   </section>
@@ -120,6 +135,7 @@
     <p class="status" id="dt-status"></p>
     <button class="btn secondary" id="btn-detail-play" type="button">▶️ 听一听</button>
     <div class="transcript" id="dt-transcript"></div>
+    <button class="btn secondary" id="btn-detail-continue" type="button" data-say="continue_story">🎙️ 接着讲这个问题</button>
     <button class="btn text danger" id="btn-detail-delete" type="button" data-say="delete">🗑️ 删掉这段录音</button>
   </section>
 
@@ -135,7 +151,7 @@
 
   <audio id="prompt-audio" preload="auto"></audio>
   <audio id="playback-audio"></audio>
-  <script src="bundle.js?v=1de488a2b9"></script>
+  <script src="bundle.js?v=cf22240afc"></script>
   <!-- 保险：脚本没加载好（比如微信缓存了坏文件）时，给个能看懂的提示而不是一个按不动的页面 -->
   <script>
   window.addEventListener('load', function () {

@@ -119,6 +119,13 @@ grandma-stories/
 
 手机上第一次打开会先「选人 / 新建名字」，之后所有录音归到这个人名下，首页右上角「换人」可切换。
 **任何手机**打开同一个链接，选同一个名字，都能看到这个人之前的录音和文字（都从 Mac 取）。
+
+**密码**：新建名字时要设一个密码（至少 4 位，数字最好记）；以后任何手机选这个人都要输对密码才能进她的故事页、听她的录音。
+输对后这部手机会记住一年，不用每次输。老用户（之前没设过密码的）第一次进时会被要求设一个。
+忘了密码在 Mac 上重设：`python3 server/manage.py set-password 奶奶 1234`。家人页的口令仍然能看到所有人（管理员用）。
+
+**退出后接着讲**：首页有「🔁 接着讲上次的问题」，故事详情页有「🎙️ 接着讲这个问题」；追问的进度按人按问题记在 Mac 上，
+关掉再打开也接得上，追问问完了就是开放地接着讲，都归到同一个问题下（文件夹名带 `_追问` / `_续`）。
 给奶奶的链接可以直接指定她，跳过选人：`https://…ts.net/?token=口令&user=用户ID&name=奶奶`（用户 ID 在 stories/users.json）。
 
 Mac 上：
@@ -128,6 +135,8 @@ python3 server/manage.py users              # 列出用户和录音数
 python3 server/manage.py rename-user 奶奶 外婆
 python3 server/manage.py delete-user 爷爷    # 录音移到 stories/_deleted/
 python3 server/manage.py index              # 重建 总览.md 和各用户的 目录.md
+python3 server/manage.py set-password 奶奶 1234  # 重设密码
+python3 server/manage.py backup             # 立刻备份到 iCloud Drive
 ```
 
 改完用户请重启服务（`launchctl kickstart -k gui/$(id -u)/com.grandma-stories.server`）。

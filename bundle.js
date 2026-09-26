@@ -1,4 +1,4 @@
-/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=1de488a2b9 */
+/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=cf22240afc */
 /* ===== config.js ===== */
 // ====== 这里是可以改的设置 ======
 window.APP_CONFIG = {
@@ -107,7 +107,11 @@ window.UI_PHRASES = {
   "enough":       "今天讲得够多了，歇一歇吧",
   "draft_found":  "上次讲到一半的故事还在，要存下来吗",
   "interrupted":  "刚才被打断了，讲到的已经存好了",
-  "listen_again": "再听一遍"
+  "listen_again": "再听一遍",
+  "password":     "请输入密码",
+  "set_password": "请设一个密码，记好了",
+  "wrong_password": "密码不对，再试一次",
+  "continue_last": "好，接着讲上次的问题"
 };
 
 /* ===== storage.js ===== */
@@ -385,7 +389,9 @@ window.WavRecorder = (() => {
     CONFIG.serverUrl = location.origin;
   }
   const serverBase = () => CONFIG.serverUrl.replace(/\/$/, '');
-  const authHeaders = () => (CONFIG.serverToken ? { 'X-Token': CONFIG.serverToken } : {});
+  const userToken = () => { try { return state.user ? (localStorage.getItem('utoken:' + state.user.id) || '') : ''; } catch (_) { return ''; } };
+  const authHeaders = () => Object.assign({}, CONFIG.serverToken ? { 'X-Token': CONFIG.serverToken } : {}, userToken() ? { 'X-User-Token': userToken() } : {});
+  const audioQuery = () => '?token=' + encodeURIComponent(CONFIG.serverToken || '') + '&ut=' + encodeURIComponent(userToken());
   const IN_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
   const MAX_PER_SESSION = 3;               // 一次打开讲满这么多段就提示歇一歇
 
@@ -485,16 +491,65 @@ window.WavRecorder = (() => {
     } catch (_) {}
     return localUsers();
   }
+  // 密码页：mode = 'set'（新建/第一次设）或 'enter'（选人后输）。resolve 返回输入的密码或 null
+  function askPassword(mode, name, hint) {
+    return new Promise((resolve) => {
+      $('#password-title').textContent = mode === 'set' ? '请给「' + name + '」设一个密码' : '请输入「' + name + '」的密码';
+      $('#password-sub').textContent = mode === 'set' ? '至少 4 位，数字最好记；以后进这个人的故事都要输它' : '';
+      $('#password-error').textContent = hint || '';
+      const input = $('#password-input'); input.value = '';
+      const ok = $('#btn-password-ok'), back = $('#btn-password-back');
+      const finish = (v) => { ok.onclick = back.onclick = null; input.onkeydown = null; resolve(v); };
+      ok.onclick = () => { const v = input.value.trim(); if (v.length < 4) { $('#password-error').textContent = '密码至少 4 位'; return; } finish(v); };
+      back.onclick = () => finish(null);
+      input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); ok.onclick(); } };
+      Speaker.say(mode === 'set' ? 'set_password' : 'password', { clear: false });
+      show('password');
+      setTimeout(() => input.focus(), 300);
+    });
+  }
+  function saveUserToken(uid, tok) { try { if (tok) localStorage.setItem('utoken:' + uid, tok); } catch (_) {} }
+  async function postJson(path, body) {
+    const r = await fetchT(serverBase() + path, { method: 'POST', body: JSON.stringify(body), headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()) }, 20000);
+    let j = {}; try { j = await r.json(); } catch (_) {}
+    return { ok: r.ok, status: r.status, j };
+  }
   async function createUser(name) {
-    if (CONFIG.serverUrl) {
-      try {
-        const r = await fetchT(serverBase() + '/api/users', { method: 'POST', body: JSON.stringify({ name }), headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()) }, 15000);
-        if (r.ok) return await r.json();
-        report('create-user-failed', 'HTTP ' + r.status);
-      } catch (e) { report('create-user-failed', errStr(e)); }
+    if (!CONFIG.serverUrl) {                          // 电脑没连上：只能先在手机上建一个（没有密码）
+      let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      return { id: 'u' + h.toString(16), name };
     }
-    let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;   // 电脑没连上：先在手机上建一个
-    return { id: 'u' + h.toString(16), name };
+    let hint = '';
+    while (true) {
+      const pw = await askPassword('set', name, hint);
+      if (pw === null) return null;
+      try {
+        const { ok, status, j } = await postJson('/api/users', { name, password: pw });
+        if (ok) { saveUserToken(j.id, j.utoken); return { id: j.id, name: j.name }; }
+        if (status === 409) { hint = '这个名字已经有人用了，密码不对'; continue; }
+        report('create-user-failed', 'HTTP ' + status);
+        hint = '电脑那边出错了，再试一次';
+      } catch (e) { report('create-user-failed', errStr(e)); hint = '连不上电脑，再试一次'; }
+    }
+  }
+  // 选人：先看有没有这个人的令牌；没有就输密码（老用户没密码 → 先设一个）
+  async function loginUser(u) {
+    if (!CONFIG.serverUrl) return true;
+    let hint = '';
+    while (true) {
+      const mode = u.hasPassword === false ? 'set' : 'enter';
+      const pw = await askPassword(mode, u.name, hint);
+      if (pw === null) return false;
+      try {
+        const { ok, status, j } = mode === 'set'
+          ? await postJson('/api/users/' + encodeURIComponent(u.id) + '/password', { password: pw })
+          : await postJson('/api/users/login', { id: u.id, password: pw });
+        if (ok) { saveUserToken(u.id, j.utoken); return true; }
+        if (status === 409 && j.needPassword) { u.hasPassword = false; continue; }
+        if (status === 403) { Speaker.say('wrong_password'); hint = '密码不对，再试一次'; continue; }
+        hint = '电脑那边出错了，再试一次';
+      } catch (e) { hint = '连不上电脑，再试一次'; }
+    }
   }
   async function showUserScreen() {
     Speaker.stop();
@@ -506,7 +561,11 @@ window.WavRecorder = (() => {
     users.forEach((u) => {
       const b = document.createElement('button');
       b.className = 'card user'; b.type = 'button'; b.textContent = u.name; b.dataset.say = 'hello';
-      b.onclick = () => selectUser(u);
+      b.onclick = async () => {
+        state.user = u;                                 // 先指向她，好取令牌
+        if (!userToken()) { if (!(await loginUser(u))) { state.user = null; showUserScreen(); return; } }
+        selectUser(u);
+      };
       box.appendChild(b);
     });
   }
@@ -534,6 +593,7 @@ window.WavRecorder = (() => {
     const btn = $('#btn-user-create'); btn.disabled = true;
     const u = await createUser(name);
     btn.disabled = false;
+    if (!u) { show('user-new'); return; }
     input.value = '';
     selectUser(u);
   }
@@ -555,6 +615,8 @@ window.WavRecorder = (() => {
   function openQuestion(q) {
     state.current = q;
     state.currentFollowup = '';
+    state.continued = false;
+    $('#btn-record').textContent = '🎙️ 按这里，开始讲';
     const done = state.stories.filter((s) => s.questionId === q.id).length;
     const total = window.QUESTIONS.length;
     const answered = new Set(state.stories.map((s) => s.questionId)).size;
@@ -785,13 +847,14 @@ window.WavRecorder = (() => {
   // ====== 保存：先存手机（存不了也先留在内存），马上进「存好了」页；上传在后台做 ======
   async function saveStory(opts) {
     const q = state.current;
-    const parentId = state.currentFollowup ? (state.parentByQuestion[q.id] || '') : '';
+    const first = state.stories.filter((s) => s.questionId === q.id && !s.followup && !s.continued).slice(-1)[0];
+    const parentId = (state.currentFollowup || state.continued) ? (first ? first.id : (state.parentByQuestion[q.id] || '')) : '';
     const story = {
       id: (state.user ? state.user.id + '-' : '') + String(Date.now()),
       user: state.user ? state.user.id : '', userName: state.user ? state.user.name : '',
       questionId: q.id, question: q.text, stage: q.stage,
       followup: state.currentFollowup || '', followupIndex: state.currentFollowup ? state.followupIndex : 0, parentId,
-      interrupted: !!opts.interrupted,
+      interrupted: !!opts.interrupted, continued: !!state.continued,
       text: state.transcript.trim(), liveText: state.transcript.trim(), serverText: '',
       serverStatus: 'none', uploaded: false,
       createdAt: Date.now(), duration: state.seconds,
@@ -820,9 +883,9 @@ window.WavRecorder = (() => {
     $('#sv-duration').textContent = '（' + fmtDuration(story.duration) + '）';
     $('#saved-note').textContent = story.interrupted ? '刚才被打断了，讲到的已经存好了。' : (CONFIG.serverUrl ? '正在传到电脑…' : (localOk ? '已经存在手机里' : ''));
     setupPlayer($('#btn-play-saved'), story.audio);
-    // 追问：这个问题还有没问过的追问、这次打开还没讲满，就接着问
+    // 追问：这个问题还有没问过的追问、这次打开还没讲满，就接着问（进度按已存的故事算，退出再进也接得上）
     const fus = q.followups || [];
-    const idx = state.asked[q.id] || 0;
+    const idx = askedCount(q.id);
     const enough = state.sessionCount >= MAX_PER_SESSION;
     const fu = (!enough && idx < fus.length) ? fus[idx] : '';
     state.followupIndex = idx + 1;
@@ -839,8 +902,30 @@ window.WavRecorder = (() => {
   function continueStory() {
     if (!state.pendingFollowup) return;
     state.currentFollowup = state.pendingFollowup;
+    state.continued = false;
     startRecording();
   }
+  const askedCount = (qid) => state.stories.filter((s) => s.questionId === qid && s.followup).length;
+  const hasMain = (qid) => state.stories.some((s) => s.questionId === qid);
+  // 退出以后回来接着讲同一个问题：还有没问的追问就问追问，问完了就开放地「接着讲」
+  function continueQuestion(q) {
+    if (!q) return;
+    state.current = q;
+    const fus = q.followups || [];
+    const idx = askedCount(q.id);
+    const fu = fus[idx] || '';
+    state.currentFollowup = fu;
+    state.continued = !fu;
+    const n = state.stories.filter((s) => s.questionId === q.id).length;
+    $('#q-stage').textContent = '接着讲';
+    $('#q-progress').textContent = n ? `这个问题已经讲了 ${n} 段，接着讲：` : '请听问题：';
+    $('#q-text').textContent = fu || q.text;
+    $('#q-answered').hidden = true;
+    $('#btn-record').textContent = '🎙️ 按这里，接着讲';
+    show('question');
+    Speaker.question(fu ? { id: q.id + '-f' + (idx + 1), text: fu } : q);
+  }
+  function lastQuestion() { const s = state.stories[0]; return s ? questionById(s.questionId) : null; }
 
   // ====== 和电脑同步：上传录音，取回电脑整理好的文字 ======
   let syncTimer = null, syncing = false;
@@ -853,6 +938,7 @@ window.WavRecorder = (() => {
       if (audio) fd.append('audio', audio, s.filename);
       const mb = audio ? audio.size / 1048576 : 0;
       const r = await fetchT(serverBase() + '/api/stories', { method: 'POST', body: fd, headers: authHeaders() }, 30000 + 30000 * mb);
+      if (r.status === 403) { needLogin(); return false; }
       if (!r.ok) report('upload-failed', 'HTTP ' + r.status);
       return r.ok;
     } catch (e) { report('upload-failed', errStr(e)); return false; }
@@ -909,11 +995,17 @@ window.WavRecorder = (() => {
     } catch (_) {} finally { syncing = false; }
     if (again) syncSoon(again);
   }
+  async function needLogin() {
+    try { localStorage.removeItem('utoken:' + state.user.id); } catch (_) {}
+    const u = state.user;
+    if (await loginUser(u)) { selectUser(u); } else { state.user = null; showUserScreen(); }
+  }
   async function refreshFromServer() {
     if (!CONFIG.serverUrl || !state.user) return false;
     let remote = [];
     try {
       const r = await fetchT(serverBase() + '/api/stories?user=' + encodeURIComponent(state.user.id), { headers: authHeaders() }, 20000);
+      if (r.status === 403) { needLogin(); return false; }
       if (!r.ok) return false;
       remote = await r.json();
     } catch (_) { return false; }
@@ -937,7 +1029,7 @@ window.WavRecorder = (() => {
         text: m.text || m.clientText || '', serverText: m.text || '',
         serverStatus: m.status === 'done' ? 'done' : (m.status === 'failed' ? 'failed' : 'pending'),
         uploaded: true, remote: true,
-        audioUrl: serverBase() + '/api/stories/' + encodeURIComponent(m.id) + '/audio' + (CONFIG.serverToken ? '?token=' + encodeURIComponent(CONFIG.serverToken) : ''),
+        audioUrl: serverBase() + '/api/stories/' + encodeURIComponent(m.id) + '/audio' + audioQuery(),
       });
       changed = true;
     }
@@ -976,6 +1068,10 @@ window.WavRecorder = (() => {
 
   // ====== 讲过的故事 ======
   function renderHome() {
+    const lq = lastQuestion();
+    const cb = $('#btn-continue-last');
+    cb.hidden = !lq;
+    if (lq) cb.textContent = '🔁 接着讲：' + (lq.text.length > 14 ? lq.text.slice(0, 14) + '…' : lq.text);
     const n = state.stories.length;
     $('#home-count').textContent = n ? `已经讲了 ${n} 段故事` : '还没有开始讲，今天就开始吧';
     $('#btn-list').textContent = n ? `📖 听听讲过的故事（${n}）` : '📖 听听讲过的故事';
@@ -1005,6 +1101,7 @@ window.WavRecorder = (() => {
     $('#dt-status').textContent = statusLine(s);
     renderTranscript($('#dt-transcript'), s.text, '这段还没有整理成文字。');
     if (!silent) setupPlayer($('#btn-detail-play'), s.audio || s.audioUrl);
+    $('#btn-detail-continue').hidden = !questionById(s.questionId);
     show('detail');
   }
 
@@ -1048,6 +1145,8 @@ window.WavRecorder = (() => {
   // ====== 按钮 ======
   function bind() {
     $('#btn-start').onclick = () => openQuestion(nextQuestion(null));
+    $('#btn-continue-last').onclick = () => continueQuestion(lastQuestion());
+    $('#btn-detail-continue').onclick = () => { const s = state.stories.find((x) => x.id === state.detailId); stopPlayback(); continueQuestion(s && questionById(s.questionId)); };
     $('#btn-switch-user').onclick = showUserScreen;
     $('#btn-user-new').onclick = () => { $('#user-name-error').textContent = ''; show('user-new'); setTimeout(() => $('#user-name-input').focus(), 300); };
     $('#btn-user-new-back').onclick = showUserScreen;
@@ -1079,7 +1178,12 @@ window.WavRecorder = (() => {
     }
     bind();
     // ?user=<id>&name=<名字>：家人给奶奶的链接可以直接指定她，不用选人
-    if (params.has('user') && params.has('name')) { await selectUser({ id: params.get('user'), name: params.get('name') }); return; }
+    if (params.has('user') && params.has('name')) {
+      const u = { id: params.get('user'), name: params.get('name') };
+      state.user = u;
+      if (!userToken() && CONFIG.serverUrl && !(await loginUser(u))) { state.user = null; showUserScreen(); return; }
+      await selectUser(u); return;
+    }
     const u = loadUser();
     if (u && u.id) { await selectUser(u); }
     else { showUserScreen(); }

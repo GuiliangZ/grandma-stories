@@ -20,6 +20,11 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import base64
+import hashlib
+import hmac
+import secrets
+
 import audio_tools
 import notify
 import transcribe
@@ -46,6 +51,48 @@ def load_users():
         return json.loads(USERS_PATH.read_text(encoding="utf-8"))
     except Exception:
         return []
+
+
+SECRET_PATH = STORIES / ".secret"
+
+
+def server_secret():
+    if not SECRET_PATH.exists():
+        SECRET_PATH.write_text(secrets.token_hex(32), encoding="utf-8")
+    return SECRET_PATH.read_text(encoding="utf-8").strip()
+
+
+def hash_password(pw, salt=None):
+    salt = salt or secrets.token_hex(8)
+    return {"salt": salt, "hash": hashlib.sha256((salt + pw).encode("utf-8")).hexdigest()}
+
+
+def check_password(user, pw):
+    p = user.get("pw")
+    return bool(p) and hmac.compare_digest(hashlib.sha256((p["salt"] + pw).encode("utf-8")).hexdigest(), p["hash"])
+
+
+def make_user_token(uid, days=365):
+    exp = int(time.time()) + days * 86400
+    msg = f"{uid}.{exp}"
+    sig = hmac.new(server_secret().encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
+    return f"{msg}.{sig}"
+
+
+def user_from_token(tok):
+    try:
+        uid, exp, sig = tok.split(".")
+        msg = f"{uid}.{exp}"
+        want = hmac.new(server_secret().encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
+        if hmac.compare_digest(sig, want) and int(exp) > time.time():
+            return uid
+    except Exception:
+        pass
+    return None
+
+
+def public_user(u):
+    return {"id": u["id"], "name": u["name"], "createdAt": u.get("createdAt", ""), "hasPassword": bool(u.get("pw"))}
 
 
 def save_users(users):
@@ -115,7 +162,7 @@ def user_dir(uid, fallback_name=""):
 def story_dirname(meta):
     ts = time.localtime((meta.get("createdAt") or time.time() * 1000) / 1000)
     q = meta.get("question") or meta.get("questionId") or "q"
-    tail = "_追问" if meta.get("followup") else ""
+    tail = "_追问" if meta.get("followup") else ("_续" if meta.get("continued") else "")
     return f"{time.strftime('%Y-%m-%d_%H%M', ts)}_{fs_name(q, 24)}{tail}"
 
 
@@ -204,7 +251,7 @@ def save_story(meta: dict, filename: str, data: bytes) -> pathlib.Path:
         "createdAt": meta.get("createdAt"), "duration": meta.get("duration"),
         "clientText": meta.get("liveText") or meta.get("text") or "",
         "followup": str(meta.get("followup") or "")[:200], "parentId": str(meta.get("parentId") or "")[:80],
-        "interrupted": bool(meta.get("interrupted")),
+        "interrupted": bool(meta.get("interrupted")), "continued": bool(meta.get("continued")),
         "audio": audio.name, "status": "pending", "text": "", "provider": CONFIG.get("provider"),
         "receivedAt": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
@@ -302,7 +349,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Token")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Token, X-User-Token")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 
     def _json(self, code, obj):
@@ -323,6 +370,22 @@ class Handler(BaseHTTPRequestHandler):
             return True
         return level == "family" and bool(fam) and given == fam
 
+    def _user_token(self):
+        q = parse_qs(urlparse(self.path).query)
+        return self.headers.get("X-User-Token") or q.get("ut", [""])[0]
+
+    def _is_family(self):
+        fam = CONFIG.get("family_token") or ""
+        q = parse_qs(urlparse(self.path).query)
+        given = self.headers.get("X-Token") or q.get("token", [""])[0]
+        return bool(fam) and given == fam
+
+    def _user_ok(self, uid):
+        """能不能碰 uid 这个人的故事：家人口令可以，或者带着这个人的令牌。"""
+        if self._is_family():
+            return True
+        return bool(uid) and user_from_token(self._user_token()) == uid
+
     def do_OPTIONS(self):
         self.send_response(204); self._cors(); self.end_headers()
 
@@ -340,9 +403,13 @@ class Handler(BaseHTTPRequestHandler):
             if not self._authed("family"):
                 return self._json(401, {"error": "bad token"})
             if path == "/api/users":
-                return self._json(200, load_users())
+                return self._json(200, [public_user(u) for u in load_users()])
             if path == "/api/stories":
                 want = parse_qs(urlparse(self.path).query).get("user", [""])[0]
+                if not want and not self._is_family():
+                    return self._json(403, {"error": "need family token to list all"})
+                if want and not self._user_ok(want):
+                    return self._json(403, {"error": "need password"})
                 items = []
                 for d in sorted(INDEX.values(), reverse=True):
                     try:
@@ -358,13 +425,18 @@ class Handler(BaseHTTPRequestHandler):
                 d = INDEX.get(m.group(1))
                 if not d:
                     return self._json(404, {"error": "not found"})
-                return self.send_file(d / read_meta(d)["audio"])
+                meta = read_meta(d)
+                if not self._user_ok(meta.get("user") or "default"):
+                    return self._json(403, {"error": "need password"})
+                return self.send_file(d / meta["audio"])
             m = re.match(r"^/api/stories/([A-Za-z0-9_-]+)$", path)
             if m:
                 d = INDEX.get(m.group(1))
                 if not d:
                     return self._json(200, {"id": m.group(1), "status": "missing"})
                 meta = read_meta(d)
+                if not self._user_ok(meta.get("user") or "default"):
+                    return self._json(403, {"error": "need password"})
                 return self._json(200, {"id": meta["id"], "status": meta["status"], "text": meta.get("text", ""), "error": meta.get("error", ""), "provider": meta.get("provider")})
             return self._json(404, {"error": "not found"})
         self.serve_static(path)
@@ -453,28 +525,68 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(401, {"error": "bad token"})
             n = backup_now()
             return self._json(200, {"ok": n >= 0, "copied": n, "dest": str(BACKUP_DST)})
-        if path == "/api/users":                       # 新建用户（同名就返回已有的）
-            if not self._authed():
-                return self._json(401, {"error": "bad token"})
+        def read_json():
             length = int(self.headers.get("Content-Length") or 0)
             try:
-                body = json.loads(self.rfile.read(length).decode("utf-8")) if 0 < length <= 4096 else {}
+                return json.loads(self.rfile.read(length).decode("utf-8")) if 0 < length <= 4096 else {}
             except Exception:
-                body = {}
+                return {}
+        if path == "/api/users":                       # 新建用户（带密码）；同名且密码对 → 当作登录
+            if not self._authed():
+                return self._json(401, {"error": "bad token"})
+            body = read_json()
             name = " ".join(str(body.get("name") or "").split())[:12]
+            pw = str(body.get("password") or "")
             if not name:
                 return self._json(400, {"error": "name required"})
+            if len(pw) < 4:
+                return self._json(400, {"error": "password too short"})
             with LOCK:
                 users = load_users()
                 for u in users:
                     if u["name"] == name:
-                        return self._json(200, u)
-                import secrets
-                u = {"id": "u" + secrets.token_hex(4), "name": name, "createdAt": time.strftime("%Y-%m-%d %H:%M:%S")}
+                        if not u.get("pw"):
+                            u["pw"] = hash_password(pw); save_users(users)
+                        elif not check_password(u, pw):
+                            return self._json(409, {"error": "name taken", "message": "这个名字已经有人用了，密码不对"})
+                        return self._json(200, dict(public_user(u), utoken=make_user_token(u["id"])))
+                u = {"id": "u" + secrets.token_hex(4), "name": name, "createdAt": time.strftime("%Y-%m-%d %H:%M:%S"), "pw": hash_password(pw)}
                 users.append(u)
                 save_users(users)
             log("新建用户", u["id"], name)
-            return self._json(201, u)
+            return self._json(201, dict(public_user(u), utoken=make_user_token(u["id"])))
+        if path == "/api/users/login":                 # 选人后输密码 → 换令牌
+            if not self._authed():
+                return self._json(401, {"error": "bad token"})
+            body = read_json()
+            uid, pw = str(body.get("id") or ""), str(body.get("password") or "")
+            u = next((x for x in load_users() if x["id"] == uid), None)
+            if not u:
+                return self._json(404, {"error": "no such user"})
+            if not u.get("pw"):
+                return self._json(409, {"error": "no password", "needPassword": True})
+            if not check_password(u, pw):
+                time.sleep(1.0)                        # 挡一下乱试
+                return self._json(403, {"error": "wrong password"})
+            return self._json(200, dict(public_user(u), utoken=make_user_token(uid)))
+        m = re.match(r"^/api/users/([A-Za-z0-9_-]+)/password$", path)
+        if m:                                           # 第一次设密码（还没密码的老用户），或家人口令重设
+            if not self._authed():
+                return self._json(401, {"error": "bad token"})
+            body = read_json()
+            pw = str(body.get("password") or "")
+            if len(pw) < 4:
+                return self._json(400, {"error": "password too short"})
+            with LOCK:
+                users = load_users()
+                u = next((x for x in users if x["id"] == m.group(1)), None)
+                if not u:
+                    return self._json(404, {"error": "no such user"})
+                if u.get("pw") and not self._is_family():
+                    return self._json(403, {"error": "already has password"})
+                u["pw"] = hash_password(pw); save_users(users)
+            log("设置密码", u["id"], u["name"])
+            return self._json(200, dict(public_user(u), utoken=make_user_token(u["id"])))
         if path != "/api/stories":
             return self._json(404, {"error": "not found"})
         if not self._authed():
@@ -493,6 +605,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": f"bad upload: {e}"})
         if not meta.get("id"):
             meta["id"] = str(int(time.time() * 1000))
+        if meta.get("user") and not self._user_ok(safe(meta["user"])):
+            return self._json(403, {"error": "need password"})
         sid = safe(meta["id"])
         existing = INDEX.get(sid)
         if existing and read_meta(existing).get("status") in ("done", "working", "pending"):
@@ -540,6 +654,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404, {"error": "not found"})
         if not self._authed():
             return self._json(401, {"error": "bad token"})
+        d0 = INDEX.get(m.group(1))
+        if d0:
+            try:
+                if not self._user_ok(read_meta(d0).get("user") or "default"):
+                    return self._json(403, {"error": "need password"})
+            except Exception:
+                pass
         with LOCK:
             d = INDEX.pop(m.group(1), None)
         if d and d.exists():

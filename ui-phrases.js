@@ -33,5 +33,9 @@ window.UI_PHRASES = {
   "enough":       "今天讲得够多了，歇一歇吧",
   "draft_found":  "上次讲到一半的故事还在，要存下来吗",
   "interrupted":  "刚才被打断了，讲到的已经存好了",
-  "listen_again": "再听一遍"
+  "listen_again": "再听一遍",
+  "password":     "请输入密码",
+  "set_password": "请设一个密码，记好了",
+  "wrong_password": "密码不对，再试一次",
+  "continue_last": "好，接着讲上次的问题"
 };
