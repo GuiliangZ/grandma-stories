@@ -525,7 +525,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype + ("; charset=utf-8" if ctype.startswith("text/") or ctype.endswith("javascript") else ""))
         self.send_header("Content-Length", str(len(data)))
         # 页面和脚本一律不缓存：微信 iOS 会把脚本缓存住甚至缓存坏的，导致"找不到 StoryStore"这类错
-        self.send_header("Cache-Control", "no-store, must-revalidate" if f.suffix in (".html", ".js", ".css") else "public, max-age=86400")
+        self.send_header("Cache-Control", "no-store, must-revalidate" if f.suffix in (".html", ".js", ".css", ".json") else "public, max-age=86400")
         self.end_headers()
         self.wfile.write(data)
 

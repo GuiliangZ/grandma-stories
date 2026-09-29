@@ -14,6 +14,8 @@ done
 if [ "$1" = "uninstall" ]; then
   launchctl unload "$PLIST" 2>/dev/null || true
   rm -f "$PLIST"; echo "已卸载 $LABEL"
+  launchctl unload "$HOME/Library/LaunchAgents/com.grandma-stories.tunnel.plist" 2>/dev/null || true
+  rm -f "$HOME/Library/LaunchAgents/com.grandma-stories.tunnel.plist"; echo "已卸载备用通道"
   exit
 fi
 mkdir -p "$HOME/Library/LaunchAgents" logs
@@ -35,5 +37,23 @@ launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST"
 echo "已安装并启动 $LABEL（日志：$(pwd)/logs/server.log）"
 
+TPLIST=$HOME/Library/LaunchAgents/com.grandma-stories.tunnel.plist
+cat > "$TPLIST" <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.grandma-stories.tunnel</string>
+  <key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-i</string><string>$PY</string><string>$(pwd)/tunnel.py</string></array>
+  <key>WorkingDirectory</key><string>$(pwd)</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>$(pwd)/logs/tunnel.log</string>
+  <key>StandardErrorPath</key><string>$(pwd)/logs/tunnel.log</string>
+</dict></plist>
+PL
+launchctl unload "$TPLIST" 2>/dev/null || true
+launchctl load "$TPLIST"
+echo "已安装备用通道 com.grandma-stories.tunnel（Cloudflare 隧道，日志：$(pwd)/logs/tunnel.log）"
 echo "备份由服务自己每天 03:00 做（server.py 里的 backup_loop），不需要单独的任务"
 echo "记得开一次 Funnel（只需一次）：tailscale funnel --bg $(python3 -c "import json;print(json.load(open('config.json')).get('port',8790))")"

@@ -1,4 +1,4 @@
-/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=087e11fbfe */
+/* 自动生成，不要手改：改 web/*.js 再跑 make_bundle.py  v=91c50b5a6a */
 /* ===== config.js ===== */
 // ====== 这里是可以改的设置 ======
 window.APP_CONFIG = {
@@ -426,6 +426,38 @@ window.WavRecorder = (() => {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), ms);
     return fetch(url, Object.assign({}, opts, { signal: ctl.signal })).finally(() => clearTimeout(t));
+  }
+
+  // 找后端：Tailscale Funnel、Cloudflare 隧道、页面自己所在的地址，谁先答应用谁。
+  // backend.json 由 Mac 上的 tunnel.py 维护（隧道地址变了会自动更新），所以页面入口可以永远不变。
+  let lastResolve = 0;
+  async function resolveServer(force) {
+    if (!force && Date.now() - lastResolve < 60000) return CONFIG.serverUrl;
+    lastResolve = Date.now();
+    const cands = [];
+    const add = (u) => { u = String(u || '').replace(/\/$/, ''); if (/^https?:\/\//.test(u) && !cands.includes(u)) cands.push(u); };
+    if (!/github\.io$/.test(location.hostname) && /^https?:$/.test(location.protocol)) add(location.origin);
+    try { add(localStorage.getItem('serverUrl')); } catch (_) {}
+    try {
+      const r = await fetchT('backend.json?ts=' + Date.now(), { cache: 'no-store' }, 6000);
+      if (r.ok) ((await r.json()).servers || []).forEach(add);
+    } catch (_) {}
+    try { add(localStorage.getItem('lastGoodServer')); } catch (_) {}
+    add((window.APP_CONFIG || {}).serverUrl);
+    if (!cands.length) return CONFIG.serverUrl;
+    const probe = (u) => fetchT(u + '/api/health', { cache: 'no-store' }, 6000).then((r) => { if (!r.ok) throw new Error('bad'); return u; });
+    try {
+      const winner = await new Promise((resolve, reject) => {
+        let left = cands.length;
+        cands.forEach((u) => probe(u).then(resolve, () => { if (--left === 0) reject(new Error('none')); }));
+      });
+      CONFIG.serverUrl = winner;
+      try { localStorage.setItem('lastGoodServer', winner); } catch (_) {}
+    } catch (_) {
+      if (!CONFIG.serverUrl) CONFIG.serverUrl = cands[0];
+      report('no-backend', cands.join(' , '));
+    }
+    return CONFIG.serverUrl;
   }
 
   const $ = (s) => document.querySelector(s);
@@ -1091,6 +1123,7 @@ window.WavRecorder = (() => {
         }
       }
     } catch (_) {} finally { syncing = false; }
+    if (again >= 30000) resolveServer(false);           // 传不上去：可能后端地址变了，重新找一次
     if (again) syncSoon(again);
   }
   async function needLogin() {
@@ -1282,6 +1315,7 @@ window.WavRecorder = (() => {
       document.body.appendChild(b);
     }
     bind();
+    await resolveServer(true);                          // 先找到通的后端，再去取用户名单
     // ?user=<id>&name=<名字>：家人给奶奶的链接可以直接指定她，不用选人
     if (params.has('user') && params.has('name')) {
       const u = { id: params.get('user'), name: params.get('name') };
