@@ -8,14 +8,19 @@
 - 手机上录的是 16kHz 单声道 WAV，安卓、苹果一样，识别引擎直接能用
 - 手机端先存一份（IndexedDB），传到电脑后再取回整理好的文字
 
-## 线上地址（GitHub Pages）
+## 链接（固定入口）
 
-- 正式：<https://guiliangz.github.io/grandma-stories/>
-- 演示版（不用麦克风）：<https://guiliangz.github.io/grandma-stories/?demo>
-- 仓库：<https://github.com/GuiliangZ/grandma-stories>
+**`https://guiliangz.github.io/grandma-stories/?token=口令`** 是永远不变的入口，发给家人用这个。
 
-是 HTTPS，所以手机浏览器会正常弹出麦克风权限（`http://` 的局域网地址拿不到麦克风）。
-奶奶在国内时 github.io 不一定打得开，正式用 Mac 的 Funnel 地址（见下），这里当备份和源码展示。
+页面放在 GitHub Pages 上；录音、名单、转写都在 Mac 上。页面打开时读 `backend.json`，并行探测里面的后端地址，谁先答应用谁：
+
+| 通道 | 地址 | 说明 |
+|---|---|---|
+| Cloudflare 隧道 | `https://xxxx.trycloudflare.com`（会变） | `server/tunnel.py` 常驻（LaunchAgent `com.grandma-stories.tunnel`），地址变了自动更新 GitHub 上的 `backend.json` 并通知你 |
+| Tailscale Funnel | `https://guiliangs-macbook-air.tail0b8d76.ts.net` | 固定地址。2026-09 Tailscale 出过公网 DNS 被撤（NXDOMAIN）的问题，恢复后会自动用回 |
+
+国内如果打不开 github.io，就用当前的直连地址（`web/backend.json` 里第一条，后面加 `/?token=口令`），页面由 Mac 直接提供。
+演示模式：链接后加 `&demo`。
 
 ## 目录
 
